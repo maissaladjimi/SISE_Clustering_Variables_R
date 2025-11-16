@@ -21,23 +21,19 @@ ClusterEngine <- R6::R6Class(
     fit = function() {
 
       if (self$method == "varclus") {
-        vc <- VarClus$new()
+        vc <- VarClus$new(n_clusters = self$n_clusters)
         vc$fit(self$data)
         self$model <- vc
       }
 
       if (self$method == "kmeans") {
-        km <- kmeansvar$new(n_clusters = self$n_clusters)
+        km <- kmeans$new(n_clusters = self$n_clusters)
         km$fit(self$data)
         self$model <- km
       }
 
       if (self$method == "acm_cah") {
-        # data must be split into quantitative & qualitative
-        X.quanti <- self$data[, sapply(self$data, is.numeric), drop = FALSE]
-        X.quali  <- self$data[, sapply(self$data, function(x) is.factor(x) || is.character(x)), drop = FALSE]
-
-        hc <- hclustvar(X.quanti, X.quali)
+        hc <- acm_cah(X.quanti, X.quali)
         self$model <- hc
       }
 

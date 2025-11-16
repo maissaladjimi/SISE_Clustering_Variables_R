@@ -4,10 +4,19 @@ source("../../R/n_clusters.R")
 source("varclus_ui.R")
 source("../../R/varclus.R")
 
+library(shinyjs)
+
 server <- function(input, output, session) {
 
+  # ---- Reactive values to track run and frozen selections ----
   run_clicked <- reactiveVal(FALSE)
+  frozen_algo <- reactiveVal(NULL)
+  frozen_active_vars <- reactiveVal(NULL)
+  frozen_data <- reactiveVal(NULL)
+  frozen_n_clusters <- reactiveVal(NULL)
 
+
+  # ---- Data upload ----
   data_uploaded <- reactive({
     req(input$file1)
 
@@ -24,16 +33,33 @@ server <- function(input, output, session) {
     )
   })
 
+  #--------number of clusters choice------
+  observe({
+    if (input$auto_k) {
+      shinyjs::disable("num_k")
+    } else {
+      shinyjs::enable("num_k")
+    }
+  })
+
+  # ---- Run Clustering button ----
   observeEvent(input$run_clustering, {
+    req(data_uploaded())
+    frozen_algo(input$algorithm)
+    frozen_active_vars(input$active_vars)
+    frozen_data(data_uploaded())
+    frozen_n_clusters(if (input$auto_k) NULL else input$num_k)
     run_clicked(TRUE)
   })
 
+
+  # ---- Main content UI ----
   output$main_content <- renderUI({
 
-    # If button has never been clicked, show preview
+    # Welcome page if Run Clustering never clicked
     if(!run_clicked()){
       tagList(
-        # ===== Logo + Title =====
+        # ===== Title =====
         fluidRow(
           style = "margin-bottom: 25px;",
           column(
@@ -55,7 +81,7 @@ server <- function(input, output, session) {
               "This application offers an interactive interface for the ",
               strong("ClusteringVariables"), " R package, enabling users to cluster variables and analyze their relationships in datasets. ",
               "The package was developed by ", em("Lamia Hatem"), ", ", em("Yasine Cheniour"),
-              ", and ", em("Maissa Lajimi"), " as part of their coursework in the Master SISE program at the University of Lyon 2. It provides the following clustering methods:",
+              ", and ", em("Maissa Lajimi"), " as part of their coursework in the Master SISE program at the University of Lyon 2. The following clustering methods are provided:",
               style = "font-size:16px; line-height:1.7; color:#444; max-width:900px; margin:auto; text-align: justify;"
             )
           )
@@ -69,7 +95,7 @@ server <- function(input, output, session) {
               style = "max-width:900px; margin:auto; margin-top:10px; font-size:16px; line-height:1.7; color:#444; text-align: justify;",
               tags$ul(
                 style = "padding-left:20px;",
-                tags$li(strong("🎯 KMeans (Mixed Variables) – "),
+                tags$li(strong("🎯 KMeans (Quantitative Variables) – "),
                         "A reallocation-based algorithm."),
                 tags$li(strong("📊 VarClus (Quantitative Variables) – "),
                         "Specifically designed for continuous data, uses a divisive hierarchical approach."),
@@ -86,7 +112,7 @@ server <- function(input, output, session) {
           tags$a(
             href = "https://github.com/maissaladjimi/SISE_Clustering_Variables_R",
             target = "_blank",
-            class = "btn",  # remove outline, use standard button
+            class = "btn",
             style = "
                   display: inline-flex;
                   align-items: center;
@@ -110,7 +136,7 @@ server <- function(input, output, session) {
           )
         ),
 
-
+        # ===== Data Preview =====
         tags$hr(style = "border: 0; border-top: 1px solid #ccc; margin: 20px 0;"),
 
         fluidRow(
@@ -123,7 +149,7 @@ server <- function(input, output, session) {
       )
     } else {
       # Button clicked → show results based on selected algorithm
-      algo <- input$algorithm
+      algo <- frozen_algo()
 
       # kmeans results --------------
 
@@ -141,10 +167,11 @@ server <- function(input, output, session) {
     }
   })
 
+  # ----------------------------------------------------------------------------
+
   # ---- Data Preview ----
   output$data_preview <- renderUI({
     if (is.null(input$file1)) {
-      # Show message when no file uploaded
       div(
         style = "font-style: italic; color: #666; font-size: 16px; margin-top:10px; padding: 10px; border: 1px dashed #ccc; border-radius: 6px; background-color:#f9f9f9;",
         " 📂 Please upload a dataset to get started."
@@ -214,22 +241,23 @@ server <- function(input, output, session) {
 
   #---------- Clustering Results ------------------------------------
 
-  clustering_engine <- reactive({
-    req(input$active_vars)
-    df <- data_uploaded()[, input$active_vars, drop = FALSE]
+  clustering_engine <- eventReactive(input$run_clustering, {
+    req(frozen_data(), frozen_active_vars(), frozen_algo())
 
-    # Data Preprocessing
-    if(input$algorithm == "varclus"){
+    df <- frozen_data()[, frozen_active_vars(), drop = FALSE]
+
+    if (frozen_algo() == "varclus") {
       df <- get_numeric_vars(df)
+    }
 
-    } else if(input$algorithm == "kmeans"){
-    } else if(input$algorithm == "acm_cah"){}
-
-    engine <- ClusterEngine$new(data = df, method = input$algorithm)
+    engine <- ClusterEngine$new(
+      data = df,
+      method = frozen_algo(),
+      n_clusters = frozen_n_clusters()
+    )
     engine$fit()
     engine
   })
-
   # ------------ VarClus Outputs -----------------------------------
 
   # Elbow plot
@@ -242,7 +270,7 @@ server <- function(input, output, session) {
   output$varclus_dendrogram <- renderPlot({
     req(clustering_engine())
     dend_fun <- clustering_engine()$model$get_dendrogram()
-    dend_fun()  # call function to plot
+    dend_fun()
   })
 
   # heatmap

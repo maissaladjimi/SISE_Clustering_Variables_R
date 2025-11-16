@@ -4,7 +4,8 @@ library(bslib)
 # Define UI for data upload app ----
 ui <- fluidPage(
 
-  theme = shinythemes::shinytheme("sandstone"),
+  theme = shinythemes::shinytheme("united"),
+  shinyjs::useShinyjs(),
 
   # App title ----
   titlePanel("ClusteringVariables"),
@@ -46,11 +47,33 @@ ui <- fluidPage(
         inputId = "algorithm",
         label = "Choose a clustering model:",
         choices = c(
-          "K-means (Mixed)" = "kmeans",
-          "VarClus (Quantitative)" = "varclus",
-          "MCA&CAH (Qualitative" = "acm_cah"
+          "KMeans" = "kmeans",
+          "VarClus" = "varclus",
+          "MCA&CAH" = "acm_cah"
         ),
         selected = "kmeans"
+      ),
+
+      tags$div(
+        tags$strong("Choose number of clusters (k):"),
+        style = "margin-bottom: 2px;"
+      ),
+
+      # --- Auto K checkbox ---
+      checkboxInput(
+        inputId = "auto_k",
+        label = "auto",
+        value = TRUE
+      ),
+
+      # --- Manual number of clusters slider ---
+      sliderInput(
+        inputId = "num_k",
+        label = NULL,
+        min = 2,
+        max = 15,
+        value = 3,
+        step = 1
       ),
 
       actionButton("run_clustering", "Run Clustering")

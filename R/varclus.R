@@ -37,12 +37,14 @@ VarClus <- R6::R6Class(
 
       self$model <- Hmisc::varclus(x = X_num, similarity = self$similarity)
 
-      # If n_clusters is not set, compute optimal k automatically
+      # Compute elbow plot always
+      if (!exists("varclus_elbow")) stop("Function varclus_elbow() not found.")
+      res <- varclus_elbow(X_num)
+      self$plot_elbow <- res$plot
+
+      # Set n_clusters automatically only if not specified
       if (is.null(self$n_clusters)) {
-        if (!exists("varclus_elbow")) stop("Function varclus_elbow() not found.")
-        res <- varclus_elbow(X_num)
         self$n_clusters <- res$optimal_k
-        self$plot_elbow <- res$plot
       }
 
       # Cut dendrogram into a fixed number of clusters
