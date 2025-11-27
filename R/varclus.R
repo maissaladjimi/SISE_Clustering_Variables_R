@@ -302,6 +302,13 @@ VarClus <- R6::R6Class(
         cluster_summary = cluster_results,
         R2_summary = cluster_details
       )
+    },
+
+    get_clusters_table = function() {
+      if (is.null(self$clusters)) {
+        stop("Model not yet fitted. Run fit() first.")
+      }
+      return(self$clusters)
     }
   ),
 

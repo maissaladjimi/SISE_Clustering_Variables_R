@@ -5,7 +5,6 @@ C:.
 ¦   .Rbuildignore
 ¦   ClusteringVariables.Rproj
 ¦   DESCRIPTION
-¦   export_r.txt
 ¦   LICENSE
 ¦   NAMESPACE
 ¦   README.md
@@ -13,13 +12,17 @@ C:.
 ¦   
 +---data
 ¦       AUTOS2005.txt
+¦       crime_dataset_from_DASL.csv
 ¦       crime_dataset_from_DASL.xls
 ¦       loisirs.txt
+¦       vote_catvarclus.csv
 ¦       vote_catvarclus.xls
 ¦       
 +---inst
 ¦   +---shiny
+¦       ¦   acm_cah_ui.R
 ¦       ¦   app.R
+¦       ¦   kmeans_ui.R
 ¦       ¦   server.R
 ¦       ¦   ui.R
 ¦       ¦   varclus_ui.R
@@ -28,15 +31,23 @@ C:.
 ¦               cluster.png
 ¦               github.png
 ¦               
++---man
+¦       acm_cah_elbow.Rd
+¦       ClusterEngine.Rd
+¦       ClustModalities.Rd
+¦       get_numeric_vars.Rd
+¦       KMeansVariablesQuant.Rd
+¦       kmeans_elbow.Rd
+¦       run_app.Rd
+¦       VarClus.Rd
+¦       varclus_elbow.Rd
+¦       
 +---R
 ¦       acm_cah.R
 ¦       clusterengine.R
 ¦       kmeans.R
 ¦       n_clusters.R
-¦       test_clust_modalites.R
-¦       TEST_FINAL_CAH.R
-¦       TEST_FINAL_KMEANS.R
-¦       test_kmeans.R
+¦       run_app.R
 ¦       utils.R
 ¦       varclus.R
 ¦       

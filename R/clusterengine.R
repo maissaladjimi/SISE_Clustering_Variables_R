@@ -1,5 +1,4 @@
 #' ClusterEngine for Managing Clustering Algorithms
-#' ClusterEngine for Managing Clustering Algorithms
 #'
 #' This R6 class provides a common wrapper around multiple clustering algorithms.
 #' It stores the input dataset, the chosen method, and the resulting fitted model.
@@ -53,17 +52,23 @@ ClusterEngine <- R6::R6Class(
       }
 
       # ---- K-means ------------------------------------------------
-      if (self$method == "kmeans") {
-        km <- kmeans$new(n_clusters = self$n_clusters)
+      # FIX: Changed from kmeans to KMeansVariablesQuant
+      else if (self$method == "kmeans") {
+        km <- KMeansVariablesQuant$new(k = self$n_clusters)
         km$fit(self$data)
         self$model <- km
       }
 
       # ---- ACM + CAH ----------------------------------------------
-      if (self$method == "acm_cah") {
-        hc <- acm_cah$new(n_clusters = self$n_clusters)
+      # FIX: Changed from acm_cah to ClustModalities
+      else if (self$method == "acm_cah") {
+        hc <- ClustModalities$new()
         hc$fit(self$data)
         self$model <- hc
+      }
+
+      else {
+        stop(paste("Unknown method:", self$method))
       }
 
       return(self$model)
@@ -71,19 +76,26 @@ ClusterEngine <- R6::R6Class(
 
 
     # ------------------------------------------------------------
-    # Predict Method
+    # Predict Method (Illustrative variables)
     # ------------------------------------------------------------
     #' @description Predict new variable's class using the fitted model
     #' @param new_data A data frame of new variable to predict
-    #' @return Predicted cluster assignments
+    #' @return Predicted cluster assignments or illustrative analysis
     predict = function(new_data) {
       if (is.null(self$model))
         stop("Model not fitted yet.")
 
-      if ("predict" %in% names(self$model))
-        return(self$model$predict(new_data))
+      # Pour VarClus : utiliser illustrative si disponible (analyse complète)
+      if ("illustrative" %in% names(self$model)) {
+        return(self$model$illustrative(new_data))
+      }
 
-      stop("This model does not support prediction.")
+      # Pour KMeans et ACM-CAH : utiliser predict (affectation simple)
+      if ("predict" %in% names(self$model)) {
+        return(self$model$predict(new_data))
+      }
+
+      stop("This model does not support prediction or illustrative variables.")
     },
 
 
@@ -105,7 +117,7 @@ ClusterEngine <- R6::R6Class(
     # ------------------------------------------------------------
     # Summary method
     # ------------------------------------------------------------
-    #' @description display details of the fitted clustering model results
+    #' @description Display details of the fitted clustering model results
     #' @return Output of the model's summary results
     summary = function() {
       if (is.null(self$model))
@@ -115,6 +127,38 @@ ClusterEngine <- R6::R6Class(
         return(self$model$summary())
 
       return(self$model)
+    },
+
+    elbow = function(k_range = 2:10, plot = TRUE) {
+      if (is.null(self$data))
+        stop("Data not provided.")
+
+      if (self$method == "kmeans") {
+        result <- kmeans_elbow(
+          X_num = self$data,
+          k_range = k_range,
+          seed = NULL
+        )
+      } else if (self$method == "varclus") {
+        result <- varclus_elbow(
+          X_num = self$data,
+          similarity = "pearson"
+        )
+      } else if (self$method == "acm_cah") {
+        result <- acm_cah_elbow(
+          X_quali = self$data,
+          method = "acm",
+          k_max = max(k_range)
+        )
+      } else {
+        stop("Elbow not implemented for this method")
+      }
+
+      if (plot) {
+        result$plot()
+      }
+
+      invisible(result)
     }
 
   )

@@ -551,7 +551,7 @@ KMeansVariablesQuant <- R6::R6Class(
 
       if (!is.null(self$clusters)) {
         cat(sprintf("Inertie totale: %.4f | Itérations: %d\n",
-                    self$inertie_total, self$n_iter))
+                    self$inertia_total, self$n_iter))
         cat("Taille des clusters:\n")
         print(table(self$clusters))
       } else {
@@ -559,6 +559,20 @@ KMeansVariablesQuant <- R6::R6Class(
       }
 
       invisible(self)
+    },
+    get_clusters_table = function() {
+      if (is.null(self$clusters))
+        stop("fit() doit être exécuté avant get_clusters_table()")
+
+      var_names <- colnames(self$data)
+
+      df <- data.frame(
+        variable = var_names,
+        cluster = self$clusters,
+        stringsAsFactors = FALSE
+      )
+
+      df[order(df$cluster, df$variable), ]
     }
   ),
 

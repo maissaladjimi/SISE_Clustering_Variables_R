@@ -2,9 +2,11 @@ Package: ClusteringVariables
 Title: Variable Clustering Using Shiny and R6 Classes
 Version: 0.0.0.9000
 Authors@R: 
-    person("Maissa", "Lajimi", email = "maissa.lajimi@univ-lyon2.fr", role = c("aut", "cre")),
-    person("Yassine", "Cheniour", email = "yassine.cheniour@univ-lyon2.fr", role = c("aut", "ctb")),
-    person("Lamia", "Hatem", email = "lamia.hatem@univ-lyon2.fr", role = c("aut", "ctb"))
+    c(
+        person("Maissa", "Lajimi", email = "maissa.lajimi@univ-lyon2.fr", role = c("aut", "cre")),
+        person("Yassine", "Cheniour", email = "yassine.cheniour@univ-lyon2.fr", role = c("aut", "ctb")),
+        person("Lamia", "Hatem", email = "lamia.hatem@univ-lyon2.fr", role = c("aut", "ctb"))
+    )
 Description: This R package offers a comprehensive collection of variable clustering
  algorithms, featuring hierarchical, relocation-based, and qualitative variable
  approaches. Built using R6 object-oriented architecture, it provides interpretive
@@ -15,6 +17,14 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
-Imports: 
+Imports:
     R6,
-    shiny
+    Hmisc,
+    dendextend,
+    FactoMineR
+Suggests:
+    shiny,
+    shinyjs,
+    shinythemes,
+    plotly,
+    testthat

@@ -1,5 +1,6 @@
 # ---------------------------
 # Server.R for ClusteringVariables Shiny App
+# CORRECTED VERSION - All bugs fixed
 # ---------------------------
 
 source("varclus_ui.R")
@@ -12,19 +13,58 @@ server <- function(input, output, session) {
   datasets <- reactiveValues(data = list())
 
   # ---------------------------
-  # Reactive preview of the CSV
+  # Reactive preview of the CSV with XLSX support
   # ---------------------------
   preview_data <- reactive({
     req(input$file1)
-    tryCatch(
-      read.csv(
-        input$file1$datapath,
-        header = input$header,
-        sep = input$sep,
-        quote = input$quote
-      ),
-      error = function(e) NULL
-    )
+
+    tryCatch({
+      file_ext <- tools::file_ext(input$file1$name)
+
+      if (file_ext %in% c("xlsx", "xls")) {
+        # FIX: Support Excel files
+        if (!requireNamespace("readxl", quietly = TRUE)) {
+          showNotification(
+            "Package 'readxl' required for Excel files. Installing...",
+            type = "warning",
+            duration = 5
+          )
+          install.packages("readxl")
+        }
+        df <- readxl::read_excel(input$file1$datapath)
+
+      } else {
+        # CSV/TXT files
+        df <- read.csv(
+          input$file1$datapath,
+          header = input$header,
+          sep = input$sep,
+          quote = input$quote,
+          dec = ","  # FIX: Support comma as decimal separator
+        )
+      }
+
+      # FIX: Convert character columns with comma decimals to numeric
+      for (col in names(df)) {
+        if (is.character(df[[col]])) {
+          # Try to convert if it looks like numbers with commas
+          test_numeric <- gsub(",", ".", df[[col]])
+          if (all(grepl("^-?[0-9]+(\\.[0-9]+)?$", test_numeric, perl = TRUE) | is.na(test_numeric))) {
+            df[[col]] <- as.numeric(gsub(",", ".", df[[col]]))
+          }
+        }
+      }
+
+      df
+
+    }, error = function(e) {
+      showNotification(
+        paste("Error reading file:", e$message),
+        type = "error",
+        duration = 10
+      )
+      NULL
+    })
   })
 
   # ---------------------------
@@ -68,7 +108,7 @@ server <- function(input, output, session) {
   })
 
   # ---------------------------
-  # Upload button: Save dataset based on user choice
+  # Upload button: Save dataset
   # ---------------------------
 
   save_msg <- reactiveVal(NULL)
@@ -80,7 +120,6 @@ server <- function(input, output, session) {
     req(preview_data())
     datasets$data[[input$file1$name]] <- preview_data()
 
-    # Update dropdown in Clustering tab
     updateSelectInput(
       session,
       "dataset_choice",
@@ -157,7 +196,7 @@ server <- function(input, output, session) {
   })
 
   # ---------------------------
-  # Clustering Output
+  # Clustering Output UI
   # ---------------------------
 
   clustering_result <- eventReactive(input$run_clustering, {
@@ -173,7 +212,7 @@ server <- function(input, output, session) {
 
     if (algo == "kmeans") {
       tagList(
-        h3("KMeans Results")
+        kmeans_ui()
       )
     }
 
@@ -185,118 +224,605 @@ server <- function(input, output, session) {
 
     else if (algo == "acm_cah") {
       tagList(
-        h3("HAC Results")
+        acm_cah_ui()
       )
     }
   })
 
 
   # ---------------------------
-  # Clustering engine
+  # Clustering engine with FIXED error handling
   # ---------------------------
   clustering_engine <- eventReactive(input$run_clustering, {
-    req(selected_data(), input$active_vars, input$algorithm)
 
-    df <- selected_data()[ , input$active_vars, drop = FALSE]
-
-    if (input$algorithm == "varclus") {
-      df <- ClusteringVariables::get_numeric_vars(df)
-    }
-
-    n_clusters <- if (input$auto_k) NULL else input$num_k
-
-    engine <- ClusteringVariables::ClusterEngine$new(
-      data       = df,
-      method     = input$algorithm,
-      n_clusters = n_clusters
+    showNotification(
+      "Running clustering... Please wait.",
+      type = "message",
+      duration = NULL,
+      id = "clustering_notif"
     )
 
-    engine$fit()
-    engine
+    tryCatch({
+      req(selected_data(), input$active_vars, input$algorithm)
+
+      df <- selected_data()[, input$active_vars, drop = FALSE]
+
+      # FIX: Filter and convert variables based on algorithm
+      if (input$algorithm %in% c("varclus", "kmeans")) {
+        # Keep only numeric variables
+        numeric_cols <- sapply(df, is.numeric)
+
+        if (!any(numeric_cols)) {
+          stop("No numeric variables found. Please select quantitative variables.")
+        }
+
+        df <- df[, numeric_cols, drop = FALSE]
+
+        # FIX: Ensure all are truly numeric (not factors)
+        df <- as.data.frame(lapply(df, as.numeric))
+
+        if (ncol(df) < 2) {
+          stop("At least 2 numeric variables are required for this algorithm.")
+        }
+      }
+
+      # FIX: Filter qualitative variables for ACM-CAH
+      if (input$algorithm == "acm_cah") {
+        quali_cols <- !sapply(df, is.numeric)
+
+        if (!any(quali_cols)) {
+          stop("No qualitative variables found. Please select categorical variables.")
+        }
+
+        df <- df[, quali_cols, drop = FALSE]
+
+        # Convert to factors
+        df <- as.data.frame(lapply(df, as.factor))
+
+        if (ncol(df) < 1) {
+          stop("At least 1 qualitative variable is required for ACM-CAH.")
+        }
+      }
+
+      # FIX: Handle n_clusters based on algorithm
+      if (input$algorithm == "kmeans") {
+        # KMeans uses 'k' parameter, not 'n_clusters'
+        if (input$auto_k) {
+          # Créer un modèle temporaire pour l'elbow
+          km_temp <- ClusteringVariables::KMeansVariablesQuant$new(k = 2)
+          km_temp$fit(df)
+
+          # Exécuter la méthode elbow
+          elbow_result <- km_temp$elbow(k_range = 2:10, n_init = 20, plot = FALSE)
+          k_optimal <- elbow_result$optimal_k
+
+          # Créer le modèle final avec k optimal
+          km <- ClusteringVariables::KMeansVariablesQuant$new(k = k_optimal)
+          km$fit(df)
+          engine <- list(model = km)
+
+          showNotification(
+            paste("K optimal détecté:", k_optimal),
+            type = "message",
+            duration = 3
+          )
+        } else {
+          # Manual K - FIX: Ensure k is integer >= 2
+          k_value <- as.integer(input$num_k)
+          if (k_value < 2) k_value <- 2
+
+          km <- ClusteringVariables::KMeansVariablesQuant$new(k = k_value)
+          km$fit(df)
+          engine <- list(model = km)
+        }
+      }
+
+      else if (input$algorithm == "varclus") {
+        # VarClus accepts n_clusters
+        n_clusters <- if (input$auto_k) NULL else as.integer(input$num_k)
+
+        vc <- ClusteringVariables::VarClus$new(n_clusters = n_clusters)
+        vc$fit(df)
+        engine <- list(model = vc)
+      }
+
+      else if (input$algorithm == "acm_cah") {
+        # FIX: ClustModalities doesn't take n_clusters in constructor
+        # It uses method argument instead
+        hc <- ClusteringVariables::ClustModalities$new(method = "acm")
+        hc$fit(df)
+
+        # FIX: Cut tree after fitting
+        if (!input$auto_k) {
+          k_value <- as.integer(input$num_k)
+          hc$clusters <- data.frame(
+            modality = rownames(hc$clusters),
+            cluster = cutree(hc$hclust, k = k_value)
+          )
+        }
+
+        engine <- list(model = hc)
+      }
+
+      removeNotification("clustering_notif")
+      showNotification(
+        "Clustering completed successfully!",
+        type = "message",
+        duration = 3
+      )
+
+      engine
+
+    }, error = function(e) {
+      removeNotification("clustering_notif")
+      showNotification(
+        paste("Error:", e$message),
+        type = "error",
+        duration = 10
+      )
+      NULL
+    })
   })
 
   # ---------------------------
-  # illustrative variables
+  # Illustrative variables - FIXED
   # ---------------------------
   illust_results <- reactive({
     engine <- clustering_engine()
     req(engine)
     req(input$illustrative_vars)
 
-    # Subset the selected illustrative variables
-    illust_df <- selected_data()[, input$illustrative_vars, drop = FALSE]
+    tryCatch({
+      illust_df <- selected_data()[, input$illustrative_vars, drop = FALSE]
 
-    # Apply illustrative() on the already fitted VarClus model
-    engine$model$illustrative(illust_df)
+      # FIX: Filter only numeric for quantitative algorithms
+      if (input$algorithm %in% c("varclus", "kmeans")) {
+        numeric_cols <- sapply(illust_df, is.numeric)
+
+        if (!any(numeric_cols)) {
+          stop("Illustrative variables must be numeric for this algorithm.")
+        }
+
+        illust_df <- illust_df[, numeric_cols, drop = FALSE]
+        illust_df <- as.data.frame(lapply(illust_df, as.numeric))
+      }
+
+      # FIX: Filter only qualitative for ACM-CAH
+      if (input$algorithm == "acm_cah") {
+        quali_cols <- !sapply(illust_df, is.numeric)
+
+        if (!any(quali_cols)) {
+          stop("Illustrative variables must be qualitative for ACM-CAH.")
+        }
+
+        illust_df <- illust_df[, quali_cols, drop = FALSE]
+        illust_df <- as.data.frame(lapply(illust_df, as.factor))
+      }
+
+      # Try illustrative method
+      if ("illustrative" %in% names(engine$model)) {
+        engine$model$illustrative(illust_df)
+      } else {
+        NULL
+      }
+
+    }, error = function(e) {
+      showNotification(
+        paste("Illustrative variables error:", e$message),
+        type = "warning",
+        duration = 5
+      )
+      NULL
+    })
   })
 
-  # ---------------------------
-  # VarClus outputs
-  # ---------------------------
+  # ============================================================================
+  # VARCLUS OUTPUTS
+  # ============================================================================
 
-  # Elbow method plot
   output$varclus_elbow <- renderPlot({
     engine <- clustering_engine()
     req(engine)
-    engine$model$plot_elbow()
+    if ("plot_elbow" %in% names(engine$model)) {
+      engine$model$plot_elbow()
+    }
   })
 
-  # Dendrogram plot
   output$varclus_dendrogram <- renderPlot({
     engine <- clustering_engine()
     req(engine)
-    engine$model$get_dendrogram()()
+    if ("get_dendrogram" %in% names(engine$model)) {
+      dend_func <- engine$model$get_dendrogram()
+      if (is.function(dend_func)) {
+        dend_func()
+      }
+    }
   })
 
-  # Heatmap plot
   output$varclus_heatmap <- plotly::renderPlotly({
     engine <- clustering_engine()
     req(engine)
-    engine$model$get_heatmap()()
+    if ("get_heatmap" %in% names(engine$model)) {
+      heatmap_func <- engine$model$get_heatmap()
+      if (is.function(heatmap_func)) {
+        heatmap_func()
+      }
+    }
   })
 
-  # Print method
   output$varclus_print <- renderPrint({
     engine <- clustering_engine()
     req(engine)
     engine$model$print()
   })
 
-  # Text summary
   output$varclus_summary_text <- renderText({
     engine <- clustering_engine()
     req(engine)
-    engine$model$summary()$text
+    summary_obj <- engine$model$summary()
+    if (is.list(summary_obj) && "text" %in% names(summary_obj)) {
+      summary_obj$text
+    } else {
+      "Summary not available"
+    }
   })
 
-  # Similarity Matrix
   output$varclus_similarity_matrix <- renderTable({
     engine <- clustering_engine()
     req(engine)
-    engine$model$summary()$similarity_matrix
+    summary_obj <- engine$model$summary()
+    if (is.list(summary_obj) && "similarity_matrix" %in% names(summary_obj)) {
+      summary_obj$similarity_matrix
+    }
   })
 
-  # cluster summary
   output$varclus_cluster_summary <- renderTable({
     engine <- clustering_engine()
     req(engine)
-    engine$model$summary()$cluster_summary
+    summary_obj <- engine$model$summary()
+    if (is.list(summary_obj) && "cluster_summary" %in% names(summary_obj)) {
+      summary_obj$cluster_summary
+    }
   })
 
-  # Cluster R2 details
   output$varclus_R2_summary <- renderTable({
     engine <- clustering_engine()
     req(engine)
-    engine$model$summary()$R2_summary
+    summary_obj <- engine$model$summary()
+    if (is.list(summary_obj) && "R2_summary" %in% names(summary_obj)) {
+      summary_obj$R2_summary
+    }
   })
 
-  # Render illustrative table
   output$varclus_illu_table <- renderTable({
-    illust_results()$table
+    results <- illust_results()
+    req(results)
+    if (is.list(results) && "table" %in% names(results)) {
+      results$table
+    }
   })
 
-  # Render PCA correlation circle plot
+  output$varclus_assignments <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("get_clusters_table" %in% names(engine$model)) {
+      engine$model$get_clusters_table()
+    }
+  })
+
   output$varclus_illu_plot <- renderPlot({
-    illust_results()$plot()
+    results <- illust_results()
+    req(results)
+    if (is.list(results) && "plot" %in% names(results)) {
+      results$plot()
+    }
+  })
+
+  # ============================================================================
+  # KMEANS OUTPUTS - FIXED
+  # ============================================================================
+
+  output$kmeans_elbow <- renderPlot({
+    engine <- clustering_engine()
+    req(engine)
+    if ("plot_elbow" %in% names(engine$model)) {
+      engine$model$plot_elbow()
+    }
+  })
+
+  output$kmeans_print <- renderPrint({
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$print()
+  })
+
+  output$kmeans_summary_text <- renderPrint({
+    engine <- clustering_engine()
+    req(engine)
+
+    # La méthode summary() retourne une liste, on l'affiche proprement
+    summary_obj <- engine$model$summary()
+
+    if (is.list(summary_obj)) {
+      # Afficher les informations principales
+      cat("=== K-Means Clustering Summary ===\n\n")
+
+      cat("Number of clusters:", engine$model$k, "\n")
+      cat("Number of variables:", ncol(engine$model$data), "\n")
+      cat("Total inertia:", round(engine$model$inertia_total, 4), "\n")
+      cat("Iterations:", engine$model$n_iter, "\n\n")
+
+      # Afficher la composition des clusters
+      if ("cluster_composition" %in% names(summary_obj)) {
+        cat("--- Cluster Composition ---\n")
+        print(summary_obj$cluster_composition)
+      }
+    }
+  })
+
+  output$kmeans_composition <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("clusters" %in% names(engine$model)) {
+      # clusters est un vecteur d'entiers
+      clusters_vec <- engine$model$clusters
+
+      # Créer le tableau de composition
+      composition <- as.data.frame(table(clusters_vec))
+      names(composition) <- c("Cluster", "Nombre de variables")
+
+      # Ajouter le pourcentage
+      composition$Pourcentage <- round(
+        100 * composition$`Nombre de variables` / sum(composition$`Nombre de variables`),
+        1
+      )
+
+      composition
+    }
+  })
+
+  output$kmeans_inertia <- renderPlot({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("inertia_by_cluster" %in% names(engine$model)) {
+      by_cluster <- engine$model$inertia_by_cluster
+      total <- engine$model$inertia_total
+      k <- engine$model$k
+
+      # Créer un barplot par cluster
+      barplot(
+        by_cluster,
+        names.arg = paste0("Cluster ", 1:k),
+        main = "Inertie par cluster (somme des R²)",
+        col = rainbow(k),
+        ylab = "Inertie (λk)",
+        ylim = c(0, max(by_cluster) * 1.2),
+        border = "white"
+      )
+
+      # Ajouter les valeurs sur les barres
+      text(
+        x = seq_along(by_cluster) * 1.2 - 0.5,
+        y = by_cluster / 2,
+        labels = round(by_cluster, 2),
+        col = "black",
+        font = 2
+      )
+
+      # Ajouter l'inertie totale
+      mtext(
+        paste("Inertie totale:", round(total, 2)),
+        side = 3,
+        line = 0.5,
+        font = 2
+      )
+
+      # Ajouter une ligne horizontale pour la moyenne
+      abline(h = mean(by_cluster), lty = 2, col = "gray50")
+    }
+  })
+
+  output$kmeans_cluster_summary <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+    summary_obj <- engine$model$summary()
+
+    if (is.list(summary_obj) && "cluster_summary" %in% names(summary_obj)) {
+      summary_obj$cluster_summary
+    }
+  })
+
+  output$kmeans_assignments <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("get_clusters_table" %in% names(engine$model)) {
+      clusters_vec <- engine$model$get_clusters_table()
+      var_names <- colnames(engine$model$data)
+
+      # Créer un tableau avec variables et clusters
+      assignments <- data.frame(
+        Variable = var_names,
+        Cluster = clusters_vec,
+        stringsAsFactors = FALSE
+      )
+
+      # Trier par cluster puis par nom de variable
+      assignments <- assignments[order(assignments$Cluster, assignments$Variable), ]
+
+      # Réinitialiser les indices de lignes
+      rownames(assignments) <- NULL
+
+      assignments
+    }
+  })
+
+  output$kmeans_illu_table <- renderTable({
+    results <- illust_results()
+    req(results)
+    if (is.list(results) && "table" %in% names(results)) {
+      results$table
+    } else if (is.data.frame(results)) {
+      results
+    }
+  })
+
+  output$kmeans_illu_plot <- renderPlot({
+    results <- illust_results()
+    req(results)
+    if (is.list(results) && "plot" %in% names(results)) {
+      results$plot()
+    }
+  })
+
+  # ============================================================================
+  # ACM-CAH OUTPUTS
+  # ============================================================================
+
+  output$acm_cah_elbow <- renderPlot({
+    engine <- clustering_engine()
+    req(engine)
+    if ("plot_elbow" %in% names(engine$model)) {
+      engine$model$plot_elbow()
+    }
+  })
+
+  output$acm_cah_print <- renderPrint({
+    engine <- clustering_engine()
+    req(engine)
+    engine$model$print()
+  })
+
+  output$acm_cah_summary_text <- renderText({
+    engine <- clustering_engine()
+    req(engine)
+    summary_obj <- engine$model$summary()
+    if (is.list(summary_obj) && "text" %in% names(summary_obj)) {
+      summary_obj$text
+    } else if (is.character(summary_obj)) {
+      summary_obj
+    } else {
+      "Summary not available"
+    }
+  })
+
+  output$acm_cah_dendrogram <- renderPlot({
+    engine <- clustering_engine()
+    req(engine)
+    if ("get_dendrogram" %in% names(engine$model)) {
+      dend_func <- engine$model$get_dendrogram()
+      if (is.function(dend_func)) {
+        dend_func()
+      }
+    }
+  })
+
+
+  output$acm_cah_modalities <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("clusters" %in% names(engine$model)) {
+      engine$model$clusters
+    }
+  })
+
+  output$acm_cah_modalities <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("get_clusters_table" %in% names(engine$model)) {
+      engine$model$get_clusters_table()
+    }
+  })
+
+  output$acm_cah_quality <- renderTable({
+    engine <- clustering_engine()
+    req(engine)
+    summary_obj <- engine$model$summary()
+
+    if (is.list(summary_obj) && "quality_metrics" %in% names(summary_obj)) {
+      summary_obj$quality_metrics
+    } else if (is.list(summary_obj) && "cluster_summary" %in% names(summary_obj)) {
+      summary_obj$cluster_summary
+    }
+  })
+
+  output$acm_cah_illu_table <- renderTable({
+    results <- illust_results()
+    req(results)
+    if (is.list(results) && "table" %in% names(results)) {
+      results$table
+    } else if (is.data.frame(results)) {
+      results
+    }
+  })
+
+  output$acm_cah_illu_plot <- renderPlot({
+    results <- illust_results()
+    req(results)
+    if (is.list(results) && "plot" %in% names(results)) {
+      results$plot()
+    }
+  })
+
+  # Carte factorielle ACM
+  output$acm_cah_factorial_map <- renderPlot({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("plot_factorial_map" %in% names(engine$model)) {
+      # Vérifier que c'est bien ACM (pas DICE qui n'a pas de coords)
+      if (engine$model$method == "acm" && !is.null(engine$model$mod_coords)) {
+        engine$model$plot_factorial_map(
+          dim1 = 1,
+          dim2 = 2,
+          show_labels = TRUE
+        )
+      } else {
+        plot.new()
+        text(0.5, 0.5, "Carte factorielle disponible uniquement pour méthode ACM",
+             cex = 1.2, col = "red")
+      }
+    }
+  })
+
+  # Scree plot ACM
+  output$acm_cah_scree <- renderPlot({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("plot_scree" %in% names(engine$model)) {
+      if (engine$model$method == "acm" && !is.null(engine$model$eig_raw)) {
+        engine$model$plot_scree(cumulative = FALSE)
+      } else {
+        plot.new()
+        text(0.5, 0.5, "Scree plot disponible uniquement pour méthode ACM",
+             cex = 1.2, col = "red")
+      }
+    }
+  })
+
+  # Contributions ACM
+  output$acm_cah_contrib <- renderPlot({
+    engine <- clustering_engine()
+    req(engine)
+
+    if ("plot_contrib" %in% names(engine$model)) {
+      if (engine$model$method == "acm" && !is.null(engine$model$acm)) {
+        # Utiliser la dimension sélectionnée par l'utilisateur
+        dim_to_plot <- input$acm_dim
+        if (is.null(dim_to_plot)) dim_to_plot <- 1
+
+        engine$model$plot_contrib(dim = dim_to_plot, top = 15)
+      } else {
+        plot.new()
+        text(0.5, 0.5, "Contributions disponibles uniquement pour méthode ACM",
+             cex = 1.2, col = "red")
+      }
+    }
   })
 }

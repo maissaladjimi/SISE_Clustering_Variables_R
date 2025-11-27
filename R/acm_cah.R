@@ -493,6 +493,19 @@ ClustModalities <- R6::R6Class(
         cat("\nTaille clusters :\n"); print(table(self$mod_clusters))
       }
       invisible(self)
+    },
+
+    get_clusters_table = function() {
+      if (is.null(self$mod_clusters))
+        stop("fit() doit être exécuté avec k avant get_clusters_table()")
+
+      df <- data.frame(
+        modality = names(self$mod_clusters),
+        cluster = unname(self$mod_clusters),
+        stringsAsFactors = FALSE
+      )
+
+      df[order(df$cluster, df$modality), ]
     }
 
   )
