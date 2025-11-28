@@ -267,8 +267,8 @@ KMeansVariablesQuant <- R6::R6Class(
 
       clust_summary <- data.frame(
         cluster = 1:K,
-        n_members = cl_sizes,
-        eigenvalue = round(lambdas, 4),
+        n_variables = cl_sizes,             # ✅ Renommé
+        lambda = round(lambdas, 4),         # ✅ Renommé
         variance_explained_pct = round(var_explained, 2),
         prop_inertia = round(prop, 4),
         stringsAsFactors = FALSE
@@ -294,8 +294,8 @@ KMeansVariablesQuant <- R6::R6Class(
       }
 
       invisible(list(
-        clust_summary = clust_summary,
-        clust_members = clust_members,
+        cluster_summary = clust_summary,     # ✅ "cluster_summary" (pas "clust_summary")
+        cluster_members = clust_members,     # ✅ "cluster_members" (déjà corrigé)
         cor_latent = round(cor_latent, 4),
         inertia_total = self$inertia_total,
         r2_matrix = as.data.frame(round(self$r2_matrix, 4))
@@ -501,6 +501,9 @@ KMeansVariablesQuant <- R6::R6Class(
 
       abline(h = 0, v = 0, lty = 3, col = "gray")
     },
+    plot_cluster_centers = function() {
+      self$plot_center_map()
+    },
     #' Elbow method to determine optimal number of clusters
     #'
     #' @param k_range Range of k values to test (default: 2:10)
@@ -513,27 +516,106 @@ KMeansVariablesQuant <- R6::R6Class(
         stop("No data available. Use fit() first or provide data to elbow.")
       }
 
-      # Call the standalone elbow function
-      result <- kmeans_elbow(
-        X_num = self$data,
-        k_range = k_range,
-        n_init = n_init,
-        seed = self$seed
+      # Calculer les inerties pour chaque k
+      p <- ncol(self$data)
+      k_range <- k_range[k_range >= 2 & k_range <= p]
+
+      if (length(k_range) < 2) {
+        stop("k_range invalide: doit contenir au moins 2 valeurs entre 2 et p")
+      }
+
+      message(sprintf("Calcul de l'elbow pour k in [%d, %d]...", min(k_range), max(k_range)))
+
+      # Standardiser les données une fois
+      X <- scale(self$data)
+      X <- as.matrix(X)
+
+      inertias <- numeric(length(k_range))
+
+      for (i in seq_along(k_range)) {
+        K <- k_range[i]
+        best_inertia <- -Inf
+
+        # Plusieurs initialisations pour chaque k
+        for (trial in 1:n_init) {
+          if (!is.null(self$seed)) {
+            set.seed(self$seed + i * 1000 + trial)
+          }
+
+          # Utiliser la méthode privée single_run
+          res <- private$single_run(X, K, self$max_iter, self$tol)
+
+          if (res$inertia_total > best_inertia) {
+            best_inertia <- res$inertia_total
+          }
+        }
+
+        inertias[i] <- best_inertia
+      }
+
+      # Créer le data.frame de résultats
+      results <- data.frame(
+        k = k_range,
+        inertia = round(inertias, 4),
+        stringsAsFactors = FALSE
       )
 
-      # Display plot if requested
+      # Détecter k optimal (méthode du coude simple)
+      if (length(k_range) >= 3) {
+        # Calculer les variations
+        deltas <- diff(inertias)
+        delta_deltas <- diff(deltas)
+
+        # Le coude = changement de pente maximal
+        optimal_idx <- which.max(abs(delta_deltas)) + 1
+        optimal_k <- k_range[optimal_idx]
+      } else {
+        optimal_k <- k_range[1]
+      }
+
+      # Fonction de plot
+      plot_func <- function() {
+        par(mar = c(5, 5, 4, 2))
+        plot(results$k, results$inertia,
+             type = "b", pch = 19, col = "steelblue", lwd = 2,
+             xlab = "Nombre de clusters (k)",
+             ylab = "Inertie totale (Σ λₖ)",
+             main = "Méthode du Coude - K-means de Variables",
+             cex.main = 1.3, cex.lab = 1.2, cex.axis = 1.1,
+             ylim = range(results$inertia) * c(0.95, 1.05))
+
+        grid(col = "gray90", lty = 1)
+
+        # Marquer le k optimal
+        points(optimal_k, results$inertia[results$k == optimal_k],
+               pch = 21, cex = 2, col = "red", bg = "yellow", lwd = 2)
+
+        text(optimal_k, results$inertia[results$k == optimal_k],
+             labels = sprintf("k = %d\n(optimal)", optimal_k),
+             pos = 3, col = "red", font = 2, cex = 0.9)
+
+        # Ligne pointillée verticale
+        abline(v = optimal_k, lty = 2, col = "red", lwd = 1.5)
+      }
+
+      # Afficher le plot si demandé
       if (plot) {
-        result$plot()
+        plot_func()
       }
 
       # Print summary
       cat("\n=== K-Means Elbow Analysis ===\n")
-      cat(sprintf("Optimal k: %d\n", result$optimal_k))
+      cat(sprintf("Optimal k: %d\n", optimal_k))
       cat(sprintf("Range tested: %d to %d\n", min(k_range), max(k_range)))
       cat("\nResults table:\n")
-      print(result$results)
+      print(results)
 
-      invisible(result)
+      # Retourner la liste de résultats
+      invisible(list(
+        optimal_k = optimal_k,
+        results = results,
+        plot = plot_func
+      ))
     },
 
     # ===========================

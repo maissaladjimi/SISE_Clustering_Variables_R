@@ -1,8 +1,28 @@
+# =============================================================================
+# inst/shiny/app.R
+# Point d'entrée de l'application Shiny
+# =============================================================================
+
 library(shiny)
+library(DT)
+library(ggplot2)
 
-# Source the UI and server
-source("ui.R")
-source("server.R")
+# =============================================================================
+# CHARGER LE PACKAGE (mode développement)
+# =============================================================================
 
-# Launch the app
-shinyApp(ui, server)
+if (!require("devtools")) install.packages("devtools")
+devtools::load_all("../..")  # Charge toutes les classes R6 depuis R/
+
+# =============================================================================
+# CHARGER UI ET SERVER
+# =============================================================================
+
+source("ui.R")      # Charge l'objet "ui"
+source("server.R")  # Charge la fonction "server"
+
+# =============================================================================
+# LANCER L'APPLICATION
+# =============================================================================
+
+shinyApp(ui = ui, server = server)
