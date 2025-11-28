@@ -9,11 +9,14 @@ library(shinyjs)
 
 # Charger les classes R6
 source("../../R/kmeans.R")  # Classe K-means
-source("../../R/acm_cah.R")                  # Classe ACM-CAH
+source("../../R/acm_cah.R")  # Classe ACM-CAH
+source("../../R/n_clusters.R")  # Fonctions elbow (varclus_elbow, kmeans_elbow, etc.)
+source("../../R/varclus.R")  # Classe VarClus
 
 # Charger les modules Shiny
 source("modules/kmeans_module.R")
 source("modules/acm_cah_module.R")
+source("modules/varclus_module.R")
 
 # =============================================================================
 # FONCTION SERVEUR
@@ -439,6 +442,65 @@ server <- function(input, output, session) {
         type = "acm_cah"
       )
 
+    } else if (!is.null(input$algorithm) && input$algorithm == "varclus") {
+
+      # VarClus : variables quantitatives uniquement
+      numeric_cols <- sapply(X, is.numeric)
+      quant_data <- X[, numeric_cols, drop = FALSE]
+
+      if (ncol(quant_data) == 0) {
+        showNotification(
+          "VarClus nécessite au moins une variable quantitative",
+          type = "error",
+          duration = 5
+        )
+        return(NULL)
+      }
+
+      if (ncol(quant_data) < 2) {
+        showNotification(
+          "VarClus nécessite au moins 2 variables quantitatives",
+          type = "error",
+          duration = 5
+        )
+        return(NULL)
+      }
+
+      # CONVERTIR EN MATRICE NUMÉRIQUE (CRITIQUE pour Hmisc::varclus)
+      quant_data <- as.matrix(quant_data)
+      mode(quant_data) <- "numeric"  # Force numeric mode
+
+      withProgress(message = "VarClus en cours...", {
+        setProgress(0.5, detail = "Construction du modèle...")
+
+        model <- create_varclus_model(
+          data = quant_data,
+          similarity = "pearson",
+          n_clusters = input$num_k
+        )
+
+        setProgress(1, detail = "Terminé !")
+      })
+
+      # Ajouter variables illustratives si sélectionnées
+      result <- list(
+        model = model,
+        type = "varclus"
+      )
+
+      if (!is.null(input$illustrative_vars) && length(input$illustrative_vars) > 0) {
+        X_illust <- df[, input$illustrative_vars, drop = FALSE]
+        X_illust_num <- X_illust[, sapply(X_illust, is.numeric), drop = FALSE]
+
+        if (ncol(X_illust_num) > 0) {
+          # Convertir aussi en matrice pour illustratives
+          result$illustrative <- as.matrix(X_illust_num)
+          mode(result$illustrative) <- "numeric"
+        }
+      }
+
+      result
+
     } else {
       showNotification("Algorithme non implémenté", type = "warning")
       NULL
@@ -465,6 +527,33 @@ server <- function(input, output, session) {
   })
 
   acm_cah_server(model_reactive = acm_cah_model)
+
+  # ===========================================================================
+  # MODULE SERVEUR: VarClus
+  # ===========================================================================
+
+  varclus_model <- reactive({
+    engine <- clustering_engine()
+    if (!is.null(engine) && engine$type == "varclus") {
+      engine$model
+    } else {
+      NULL
+    }
+  })
+
+  varclus_illustrative <- reactive({
+    engine <- clustering_engine()
+    if (!is.null(engine) && engine$type == "varclus") {
+      engine$illustrative
+    } else {
+      NULL
+    }
+  })
+
+  varclus_server(
+    model_reactive = varclus_model,
+    illustrative_reactive = varclus_illustrative
+  )
 
   # ===========================================================================
   # OBSERVER: Changer d'onglet selon l'algo sélectionné

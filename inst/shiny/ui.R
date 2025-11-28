@@ -11,6 +11,7 @@ library(DT)
 # Charger les modules
 source("modules/kmeans_module.R")
 source("modules/acm_cah_module.R")
+source("modules/varclus_module.R")
 
 # =============================================================================
 # INTERFACE UTILISATEUR (navbarPage)
@@ -416,7 +417,8 @@ ui <- navbarPage(
             "Select Clustering Algorithm:",
             choices = c(
               "K-Means (quantitative variables)" = "kmeans",
-              "ACM-CAH (qualitative variables)" = "acm_cah"
+              "ACM-CAH (qualitative variables)" = "acm_cah",
+              "VarClus (quantitative variables)" = "varclus"
             ),
             selected = "kmeans"
           ),
@@ -509,15 +511,10 @@ ui <- navbarPage(
           # VarClus
           tabPanel(
             "VarClus",
+            varclus_ui(),
             value = "varclus",
             icon = icon("project-diagram"),
-            br(),
-            div(
-              class = "alert alert-info",
-              style = "margin: 20px;",
-              icon("info-circle"),
-              " Module VarClus en cours de développement..."
-            )
+            br()
           ),
 
           # ACM-CAH
