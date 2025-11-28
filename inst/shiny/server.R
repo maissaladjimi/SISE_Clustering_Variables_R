@@ -7,8 +7,13 @@ library(shiny)
 library(DT)
 library(shinyjs)
 
-# Charger le module K-means
+# Charger les classes R6
+source("../../R/kmeans.R")  # Classe K-means
+source("../../R/acm_cah.R")                  # Classe ACM-CAH
+
+# Charger les modules Shiny
 source("modules/kmeans_module.R")
+source("modules/acm_cah_module.R")
 
 # =============================================================================
 # FONCTION SERVEUR
@@ -397,6 +402,43 @@ server <- function(input, output, session) {
 
       result
 
+    } else if (!is.null(input$algorithm) && input$algorithm == "acm_cah") {
+
+      # ACM-CAH : variables qualitatives uniquement
+      quali_data <- X[, sapply(X, is.factor) | sapply(X, is.character), drop = FALSE]
+
+      # Convertir en factors si nécessaire
+      if (ncol(quali_data) > 0) {
+        quali_data[] <- lapply(quali_data, factor)
+      }
+
+      if (ncol(quali_data) == 0) {
+        showNotification(
+          "ACM-CAH nécessite au moins une variable qualitative",
+          type = "error",
+          duration = 5
+        )
+        return(NULL)
+      }
+
+      withProgress(message = "ACM-CAH en cours...", {
+        setProgress(0.5, detail = "Construction du modèle...")
+
+        model <- create_acm_cah_model(
+          data = quali_data,
+          method = input$acm_cah_method,
+          n_axes = if (input$acm_cah_method == "acm") input$acm_cah_n_axes else 2,
+          k = input$num_k
+        )
+
+        setProgress(1, detail = "Terminé !")
+      })
+
+      list(
+        model = model,
+        type = "acm_cah"
+      )
+
     } else {
       showNotification("Algorithme non implémenté", type = "warning")
       NULL
@@ -408,6 +450,21 @@ server <- function(input, output, session) {
   # ===========================================================================
 
   kmeansServer("kmeans_tab", engine_reactive = clustering_engine)
+
+  # ===========================================================================
+  # MODULE SERVEUR: ACM-CAH
+  # ===========================================================================
+
+  acm_cah_model <- reactive({
+    engine <- clustering_engine()
+    if (!is.null(engine) && engine$type == "acm_cah") {
+      engine$model
+    } else {
+      NULL
+    }
+  })
+
+  acm_cah_server(model_reactive = acm_cah_model)
 
   # ===========================================================================
   # OBSERVER: Changer d'onglet selon l'algo sélectionné

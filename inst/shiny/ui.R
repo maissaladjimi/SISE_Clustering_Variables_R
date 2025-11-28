@@ -8,8 +8,9 @@ library(shinyjs)
 library(shinythemes)
 library(DT)
 
-# Charger le module K-means
+# Charger les modules
 source("modules/kmeans_module.R")
+source("modules/acm_cah_module.R")
 
 # =============================================================================
 # INTERFACE UTILISATEUR (navbarPage)
@@ -411,15 +412,44 @@ ui <- navbarPage(
           ),
 
           radioButtons(
-            inputId = "algorithm",
-            label = NULL,
+            "algorithm",
+            "Select Clustering Algorithm:",
             choices = c(
-              "KMeans (Quant)" = "kmeans",
-              "VarClus (Quant)" = "varclus",
-              "HAC (Qualit)" = "acm_cah"
+              "K-Means (quantitative variables)" = "kmeans",
+              "ACM-CAH (qualitative variables)" = "acm_cah"
             ),
             selected = "kmeans"
+          ),
+
+          conditionalPanel(
+            condition = "input.algorithm == 'acm_cah'",
+
+            hr(),
+
+            h5("ACM-CAH Parameters", style = "font-weight: 600; color: #2d3748;"),
+
+            radioButtons(
+              "acm_cah_method",
+              "Method:",
+              choices = c(
+                "Dice Distance" = "dice",
+                "MCA + CAH" = "acm"
+              ),
+              selected = "dice"
+            ),
+
+            conditionalPanel(
+              condition = "input.acm_cah_method == 'acm'",
+              numericInput(
+                "acm_cah_n_axes",
+                "Number of MCA axes:",
+                value = 2,
+                min = 2,
+                max = 5
+              )
+            )
           )
+
         ),
 
         # Number of Clusters
@@ -493,15 +523,10 @@ ui <- navbarPage(
           # ACM-CAH
           tabPanel(
             "ACM-CAH",
+            acm_cah_ui(),
             value = "acm_cah",
             icon = icon("sitemap"),
-            br(),
-            div(
-              class = "alert alert-info",
-              style = "margin: 20px;",
-              icon("info-circle"),
-              " Module ACM-CAH en cours de développement..."
-            )
+            br()
           )
         )
       )
