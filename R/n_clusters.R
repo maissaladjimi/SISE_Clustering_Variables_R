@@ -231,15 +231,28 @@ acm_cah_elbow <- function(X_quali, method = "acm", k_max = 10) {
     gain = c(NA, -diff(heights_k))  # Gain = reduction in height
   )
 
-  # Detect optimal k (use elbow on heights, inverted since we want small heights)
-  # For CAH, elbow is where height drops sharply
+  # Detect optimal k using MAXIMUM MARGINAL GAIN
+  # For CAH: optimal k is where we lose the most information by merging
+  # The gain represents the reduction in height when going from k-1 to k clusters
   if (k_max >= 3) {
-    # Use k >= 2 for elbow detection
-    k_vals_detect <- results$k[results$k >= 2]
-    y_vals_detect <- results$height[results$k >= 2]
-    optimal_k <- detect_elbow(k_vals_detect, y_vals_detect)
+    # Use gain (reduction in height) - already computed in results$gain
+    gain_data <- results$gain[!is.na(results$gain)]
+    k_with_gain <- results$k[!is.na(results$gain)]
+
+    # Optimal k = k with MAXIMUM gain (biggest jump in the dendrogram)
+    max_gain_idx <- which.max(gain_data)
+    optimal_k <- k_with_gain[max_gain_idx]
+
+    # Ensure k >= 2
+    if (optimal_k < 2) optimal_k <- 2
+
+    # Get top 3 k values for suggestion
+    top_gains_idx <- order(gain_data, decreasing = TRUE)[1:min(3, length(gain_data))]
+    suggested_k <- k_with_gain[top_gains_idx]
+
   } else {
     optimal_k <- 2
+    suggested_k <- c(2)
     warning("k_max too small for reliable elbow detection")
   }
 
@@ -273,6 +286,7 @@ acm_cah_elbow <- function(X_quali, method = "acm", k_max = 10) {
   return(list(
     optimal_k = optimal_k,
     results = results,
+    suggested_k = suggested_k,  # Top 3 k candidats basés sur gain marginal
     plot = plot_elbow
   ))
 }

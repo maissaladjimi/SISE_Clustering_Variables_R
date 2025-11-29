@@ -1,6 +1,6 @@
 # =============================================================================
 # inst/shiny/server.R
-# Logique serveur de l'application Shiny
+# Logique serveur de l'application Shiny - VERSION FINALE
 # =============================================================================
 
 library(shiny)
@@ -8,10 +8,10 @@ library(DT)
 library(shinyjs)
 
 # Charger les classes R6
-source("../../R/kmeans.R")  # Classe K-means
-source("../../R/acm_cah.R")  # Classe ACM-CAH
-source("../../R/n_clusters.R")  # Fonctions elbow (varclus_elbow, kmeans_elbow, etc.)
-source("../../R/varclus.R")  # Classe VarClus
+source("../../R/n_clusters.R")  # Fonctions elbow (DOIT être chargé AVANT les classes)
+source("../../R/kmeans.R")      # Classe K-means
+source("../../R/acm_cah.R")     # Classe ACM-CAH
+source("../../R/varclus.R")     # Classe VarClus
 
 # Charger les modules Shiny
 source("modules/kmeans_module.R")
@@ -319,7 +319,10 @@ server <- function(input, output, session) {
     df <- selected_data()
     X <- df[, input$active_vars, drop = FALSE]
 
-    # Vérifier que les variables sont numériques pour K-means
+    # =========================================================================
+    # K-MEANS
+    # =========================================================================
+
     if (!is.null(input$algorithm) && input$algorithm == "kmeans") {
       if (!all(sapply(X, is.numeric))) {
         showNotification(
@@ -356,7 +359,7 @@ server <- function(input, output, session) {
           k_opt <- elbow_res$optimal_k
 
           showNotification(
-            paste("k optimal détecté:", k_opt),
+            paste("✅ K-means: k optimal détecté =", k_opt),
             type = "message",
             duration = 5
           )
@@ -386,7 +389,7 @@ server <- function(input, output, session) {
         setProgress(1, detail = "Terminé !")
       })
 
-      # Retourner l'objet avec variables illustratives
+      # Ajouter variables illustratives si sélectionnées
       result <- list(
         model = km,
         type = "kmeans"
@@ -395,7 +398,7 @@ server <- function(input, output, session) {
       # Ajouter variables illustratives si sélectionnées
       if (!is.null(input$illustrative_vars) && length(input$illustrative_vars) > 0) {
         X_illust <- df[, input$illustrative_vars, drop = FALSE]
-        # Garder uniquement les variables numériques
+        # Garder uniquement les variables QUANTITATIVES (K-means = tout quantitatif)
         X_illust_num <- X_illust[, sapply(X_illust, is.numeric), drop = FALSE]
 
         if (ncol(X_illust_num) > 0) {
@@ -404,6 +407,10 @@ server <- function(input, output, session) {
       }
 
       result
+
+      # =========================================================================
+      # ACM-CAH
+      # =========================================================================
 
     } else if (!is.null(input$algorithm) && input$algorithm == "acm_cah") {
 
@@ -425,13 +432,38 @@ server <- function(input, output, session) {
       }
 
       withProgress(message = "ACM-CAH en cours...", {
+
+        # Déterminer k optimal si demandé
+        if (input$auto_k) {
+          setProgress(0.2, detail = "Détection automatique de k...")
+
+          elbow_res <- acm_cah_elbow(
+            X_quali = quali_data,
+            method = input$acm_cah_method,
+            k_max = min(10, nrow(quali_data))
+          )
+
+          k_opt <- elbow_res$optimal_k
+          suggested <- elbow_res$suggested_k  # Top 3 k candidats
+
+          showNotification(
+            paste0("✅ ACM-CAH: k optimal = ", k_opt,
+                   " (k suggérés: ", paste(suggested, collapse = ", "),
+                   ") - Vérifiez le graphique"),
+            type = "message",
+            duration = 8
+          )
+        } else {
+          k_opt <- input$num_k
+        }
+
         setProgress(0.5, detail = "Construction du modèle...")
 
         model <- create_acm_cah_model(
           data = quali_data,
           method = input$acm_cah_method,
           n_axes = if (input$acm_cah_method == "acm") input$acm_cah_n_axes else 2,
-          k = input$num_k
+          k = k_opt
         )
 
         setProgress(1, detail = "Terminé !")
@@ -441,6 +473,10 @@ server <- function(input, output, session) {
         model = model,
         type = "acm_cah"
       )
+
+      # =========================================================================
+      # VARCLUS
+      # =========================================================================
 
     } else if (!is.null(input$algorithm) && input$algorithm == "varclus") {
 
@@ -468,15 +504,36 @@ server <- function(input, output, session) {
 
       # CONVERTIR EN MATRICE NUMÉRIQUE (CRITIQUE pour Hmisc::varclus)
       quant_data <- as.matrix(quant_data)
-      mode(quant_data) <- "numeric"  # Force numeric mode
+      mode(quant_data) <- "numeric"
 
       withProgress(message = "VarClus en cours...", {
+
+        # Déterminer k optimal si demandé
+        if (input$auto_k) {
+          setProgress(0.2, detail = "Détection automatique de k...")
+
+          elbow_res <- varclus_elbow(
+            X_num = quant_data,
+            similarity = "pearson"
+          )
+
+          k_opt <- elbow_res$optimal_k
+
+          showNotification(
+            paste("✅ VarClus: k optimal détecté =", k_opt),
+            type = "message",
+            duration = 5
+          )
+        } else {
+          k_opt <- input$num_k
+        }
+
         setProgress(0.5, detail = "Construction du modèle...")
 
         model <- create_varclus_model(
           data = quant_data,
           similarity = "pearson",
-          n_clusters = input$num_k
+          n_clusters = k_opt
         )
 
         setProgress(1, detail = "Terminé !")
