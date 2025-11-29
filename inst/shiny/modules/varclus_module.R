@@ -1,6 +1,7 @@
 # ==============================================================================
 # VARCLUS MODULE - UI & SERVER
-# Module Shiny complet pour VarClus avec illustrative, predict, summary
+# Module Shiny pour VarClus avec illustrative
+# Compatible avec clustering_engine
 # ==============================================================================
 
 library(shiny)
@@ -55,119 +56,122 @@ varclus_ui <- function() {
           column(
             width = 6,
             div(
-              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"),
-            h5("🔥 Correlation Heatmap", style = "color: #2d3748; font-weight: 600;"),
-            plotly::plotlyOutput("varclus_heatmap", height = "400px")
-          )
-        )
-      ),
-
-      br(),
-
-      fluidRow(
-        column(
-          width = 12,
-          div(
-            style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-            h5("📉 Elbow Method", style = "color: #2d3748; font-weight: 600;"),
-            plotOutput("varclus_elbow", height = "400px")
-          )
-        )
-      )
-    ),
-
-    # ========== TAB 3: DETAILED STATS ==========
-    tabPanel(
-      "📋 Detailed Stats",
-      value = "stats",
-      br(),
-
-      fluidRow(
-        column(
-          width = 6,
-          div(
-            style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-            h5("📊 Cluster Summary", style = "color: #2d3748; font-weight: 600;"),
-            DTOutput("varclus_cluster_summary")
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("🔥 Correlation Heatmap", style = "color: #2d3748; font-weight: 600;"),
+              plotOutput("varclus_heatmap", height = "400px")
+            )
           )
         ),
-        column(
-          width = 6,
-          div(
-            style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-            h5("🎯 Cluster Quality", style = "color: #2d3748; font-weight: 600;"),
-            DTOutput("varclus_cluster_quality")
+
+        br(),
+
+        fluidRow(
+          column(
+            width = 12,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📉 Elbow Method", style = "color: #2d3748; font-weight: 600;"),
+              plotOutput("varclus_elbow", height = "400px")
+            )
           )
         )
       ),
 
-      br(),
+      # ========== TAB 3: DETAILED STATS ==========
+      tabPanel(
+        "📋 Detailed Stats",
+        value = "stats",
+        br(),
 
-      fluidRow(
-        column(
-          width = 12,
-          div(
-            style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
-            h5("📈 R² Details by Variable", style = "color: #2d3748; font-weight: 600;"),
-            DTOutput("varclus_r2_details")
+        fluidRow(
+          column(
+            width = 6,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📊 Cluster Summary", style = "color: #2d3748; font-weight: 600;"),
+              DTOutput("varclus_cluster_summary")
+            )
+          ),
+          column(
+            width = 6,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("🎯 Cluster Quality", style = "color: #2d3748; font-weight: 600;"),
+              DTOutput("varclus_cluster_quality")
+            )
+          )
+        ),
+
+        br(),
+
+        fluidRow(
+          column(
+            width = 12,
+            div(
+              style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+              h5("📈 R² Details by Variable", style = "color: #2d3748; font-weight: 600;"),
+              DTOutput("varclus_r2_details")
+            )
           )
         )
-      )
-    ),
+      ),
 
-    # ========== TAB 4: ILLUSTRATIVE VARIABLES ==========
-    tabPanel(
-      "🔍 Illustrative Variables",
-      value = "illustrative",
-      br(),
+      # ========== TAB 4: ILLUSTRATIVE VARIABLES ==========
+      tabPanel(
+        "🔍 Illustrative Variables",
+        value = "illustrative",
+        br(),
 
-      fluidRow(
-        column(
-          width = 12,
-          div(
-            style = "background: #f7fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #48bb78;",
-            h4("📌 Illustrative Variables Analysis", style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
-            p("Illustrative variables are regressed on cluster latent components (PC1).
+        fluidRow(
+          column(
+            width = 12,
+            div(
+              style = "background: #f7fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #48bb78;",
+              h4("📌 Illustrative Variables Analysis", style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
+              p("Illustrative variables are regressed on cluster latent components (PC1).
                  This shows how they relate to the cluster structure and allows visual interpretation via PCA.",
-              style = "color: #4a5568; font-size: 15px;")
+                style = "color: #4a5568; font-size: 15px;")
+            )
           )
-        )
-      ),
+        ),
 
-      br(),
+        br(),
 
-      uiOutput("varclus_illustrative_content")
+        uiOutput("varclus_illustrative_content")
+      )
     )
-  )
   )
 }
 
 # ==============================================================================
-# SERVER MODULE
+# SERVER MODULE (ADAPTÉ POUR engine_reactive)
 # ==============================================================================
 
-varclus_server <- function(input, output, session, data, k, illustrative_vars = NULL) {
+varclus_server <- function(engine_reactive, input = NULL, output = NULL, session = NULL) {
 
-  # Reactive: Fit VarClus model
+  # Si input/output/session ne sont pas fournis, utiliser le parent scope
+  if (is.null(input)) input <- shiny::getDefaultReactiveDomain()$input
+  if (is.null(output)) output <- shiny::getDefaultReactiveDomain()$output
+  if (is.null(session)) session <- shiny::getDefaultReactiveDomain()
+
+  # Extraire le modèle VarClus depuis clustering_engine
   varclus_model <- reactive({
-    req(data())
-
-    tryCatch({
-      # Créer instance VarClus
-      vc <- VarClus$new(similarity = "pearson", n_clusters = k())
-
-      # Fit
-      vc$fit(data())
-
-      vc
-    }, error = function(e) {
-      showNotification(
-        paste("Error in VarClus:", e$message),
-        type = "error",
-        duration = 10
-      )
+    engine <- engine_reactive()
+    if (!is.null(engine) && engine$type == "varclus") {
+      engine$model
+    } else {
       NULL
-    })
+    }
+  })
+
+  # Extraire les variables illustratives depuis clustering_engine
+  illustrative_data <- reactive({
+    engine <- engine_reactive()
+    if (!is.null(engine) && engine$type == "varclus") {
+      engine$illustrative
+    } else {
+      NULL
+    }
   })
 
   # Reactive: Summary complet
@@ -238,16 +242,18 @@ varclus_server <- function(input, output, session, data, k, illustrative_vars = 
   })
 
   # ========== OUTPUT: HEATMAP ==========
-  output$varclus_heatmap <- plotly::renderPlotly({
+  output$varclus_heatmap <- renderPlot({
     req(varclus_model())
     tryCatch({
-      heatmap_func <- varclus_model()$get_heatmap()
-      heatmap_func()
+      cor_matrix <- cor(varclus_model()$X)
+      heatmap(cor_matrix,
+              col = colorRampPalette(c("blue", "white", "red"))(100),
+              scale = "none",
+              main = "Correlation Heatmap",
+              margins = c(10, 10))
     }, error = function(e) {
-      plotly::plot_ly() %>%
-        plotly::layout(
-          title = list(text = paste("Error:", e$message), font = list(color = "red"))
-        )
+      plot.new()
+      text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
     })
   })
 
@@ -322,29 +328,25 @@ varclus_server <- function(input, output, session, data, k, illustrative_vars = 
     )
   })
 
-  # ========== ILLUSTRATIVE VARIABLES ==========
+  # ========== ILLUSTRATIVE VARIABLES (NOUVEAU!) ==========
 
   # Reactive: Calculer illustrative si variables présentes
   illustrative_results <- reactive({
     req(varclus_model())
 
-    if (!is.null(illustrative_vars) && !is.null(illustrative_vars())) {
-      illust_data <- illustrative_vars()
+    illust_data <- illustrative_data()
 
-      if (ncol(illust_data) > 0) {
-        tryCatch({
-          varclus_model()$illustrative(illust_data)
-        }, error = function(e) {
-          showNotification(
-            paste("Error in illustrative:", e$message),
-            type = "error",
-            duration = 10
-          )
-          NULL
-        })
-      } else {
+    if (!is.null(illust_data) && ncol(illust_data) > 0) {
+      tryCatch({
+        varclus_model()$illustrative(illust_data)
+      }, error = function(e) {
+        showNotification(
+          paste("Error in illustrative:", e$message),
+          type = "error",
+          duration = 10
+        )
         NULL
-      }
+      })
     } else {
       NULL
     }

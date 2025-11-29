@@ -261,7 +261,7 @@ ClustModalities <- R6::R6Class(
            xlab=paste0("Dim", dims[1], " (", round(perc[1],2), "%)"),
            ylab=paste0("Dim", dims[2], " (", round(perc[2],2), "%)"),
            main="Carte factorielle (modalités)")
-      text(coords[,1], coords[,2], labels=rownames(coords), pos=3, cex=.6)
+      text(coords[,1], coords[,2], labels=rownames(coords), pos=3, cex=.8,font=2)
 
       abline(h=0,v=0,lty=3)
     },

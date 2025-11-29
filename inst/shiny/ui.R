@@ -156,20 +156,66 @@ ui <- navbarPage(
 
     tags$head(
       tags$style(HTML("
-        .sidebar-fixed {
-          position: fixed;
-          top: 51px;
-          bottom: 0;
-          left: 0;
-          width: 20%;
-          overflow-y: auto;
+        .stat-card {
+          background: white;
           padding: 15px;
-          background: #f8f9fa;
-          z-index: 100;
+          border-radius: 8px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+          text-align: center;
+          transition: all 0.2s;
+          height: 100%;
         }
-        .main-panel-adjusted {
-          margin-left: 20%;
-          width: 80%;
+        .stat-card:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .stat-icon {
+          font-size: 2em;
+          margin-bottom: 8px;
+        }
+        .stat-label {
+          color: #718096;
+          font-size: 0.8em;
+          margin-bottom: 8px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .stat-value {
+          color: #2d3748;
+          font-size: 1.6em;
+          font-weight: 700;
+        }
+        .table-wrapper {
+          overflow-x: auto;
+          background: #ffffff;
+          border-radius: 8px;
+          border: 1px solid #e2e8f0;
+        }
+        .table-wrapper table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.9em;
+          margin: 0;
+        }
+        .table-wrapper table th {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 12px 15px;
+          text-align: center;
+          font-weight: 600;
+          border: none;
+          font-size: 0.9em;
+        }
+        .table-wrapper table td {
+          padding: 10px 15px;
+          border-bottom: 1px solid #e2e8f0;
+          background: white;
+          text-align: center;
+          color: #2d3748;
+        }
+        .table-wrapper table tbody tr:hover td {
+          background: #f7fafc;
         }
       "))
     ),
@@ -493,39 +539,7 @@ ui <- navbarPage(
       # ===== MAIN PANEL : Résultats =====
       div(
         class = "col-sm-9 main-panel-adjusted",
-
-        # Onglets des algorithmes
-        tabsetPanel(
-          id = "algo_tabs",
-          type = "tabs",
-
-          # K-means
-          tabPanel(
-            "K-means",
-            value = "kmeans",
-            icon = icon("chart-line"),
-            br(),
-            kmeansUI("kmeans_tab")
-          ),
-
-          # VarClus
-          tabPanel(
-            "VarClus",
-            varclus_ui(),
-            value = "varclus",
-            icon = icon("project-diagram"),
-            br()
-          ),
-
-          # ACM-CAH
-          tabPanel(
-            "ACM-CAH",
-            acm_cah_ui(),
-            value = "acm_cah",
-            icon = icon("sitemap"),
-            br()
-          )
-        )
+        uiOutput("clustering_output")  # Affichage conditionnel
       )
     )
   )

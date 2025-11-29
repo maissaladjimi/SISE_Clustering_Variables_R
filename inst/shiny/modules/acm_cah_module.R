@@ -1,6 +1,7 @@
 # ==============================================================================
 # ACM-CAH MODULE - UI & SERVER
-# Module Shiny complet pour ACM-CAH avec illustrative, predict, summary
+# Module Shiny pour ACM-CAH avec illustrative
+# Compatible avec clustering_engine
 # ==============================================================================
 
 library(shiny)
@@ -145,41 +146,85 @@ acm_cah_ui <- function() {
         br(),
 
         uiOutput("acm_cah_illustrative_content")
-      )
+      ),
+
+      # ========== TAB 5: ILLUSTRATIVE NUMERIC (NOUVEAU!) ==========
+      tabPanel(
+        "🔢 Illustrative Numeric",
+        value = "illustrative_numeric",
+        br(),
+
+        fluidRow(
+          column(
+            width = 12,
+            div(
+              style = "background: #f7fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #4299e1;",
+              h4("📊 Quantitative Illustrative Variables", style = "color: #2d3748; font-weight: 600; margin-top: 0;"),
+              p("Project quantitative variables on MCA factorial space.",
+                style = "color: #4a5568; font-size: 15px;")
+            )
+          )
+        ),
+
+        br(),
+
+        uiOutput("acm_cah_illustrative_numeric_content")
+      ),
     )
   )
 }
 
 # ==============================================================================
-# SERVER MODULE
+# SERVER MODULE (ADAPTÉ POUR engine_reactive)
 # ==============================================================================
 
-acm_cah_server <- function(input, output, session, data, k, method, n_axes, illustrative_vars = NULL) {
+acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session = NULL) {
 
-  # Reactive: Fit ACM-CAH model
+  # Si input/output/session ne sont pas fournis, utiliser le parent scope
+  if (is.null(input)) input <- shiny::getDefaultReactiveDomain()$input
+  if (is.null(output)) output <- shiny::getDefaultReactiveDomain()$output
+  if (is.null(session)) session <- shiny::getDefaultReactiveDomain()
+
+  # Extraire le modèle ACM-CAH depuis clustering_engine
   acm_cah_model <- reactive({
-    req(data())
-    req(k())
-    req(method())
-
-    tryCatch({
-      # Créer instance ACM-CAH
-      n_ax <- if (method() == "acm" && !is.null(n_axes())) n_axes() else NULL
-
-      cm <- ClustModalities$new(method = method(), n_axes = n_ax)
-
-      # Fit
-      cm$fit(data(), k = k())
-
-      cm
-    }, error = function(e) {
-      showNotification(
-        paste("Error in ACM-CAH:", e$message),
-        type = "error",
-        duration = 10
-      )
+    engine <- engine_reactive()
+    if (!is.null(engine) && engine$type == "acm_cah") {
+      engine$model
+    } else {
       NULL
-    })
+    }
+  })
+
+  # Extraire les variables illustratives depuis clustering_engine
+  illustrative_data <- reactive({
+    engine <- engine_reactive()
+    if (!is.null(engine) && engine$type == "acm_cah") {
+      engine$illustrative
+    } else {
+      NULL
+    }
+  })
+
+  # Extraire les variables illustratives QUANTITATIVES
+  illustrative_numeric_data <- reactive({
+    engine <- engine_reactive()
+    if (!is.null(engine) && engine$type == "acm_cah") {
+      engine$illustrative_numeric
+    } else {
+      NULL
+    }
+  })
+
+  # Récupérer k depuis le modèle
+  k_value <- reactive({
+    req(acm_cah_model())
+    acm_cah_model()$k
+  })
+
+  # Récupérer méthode depuis le modèle
+  method_value <- reactive({
+    req(acm_cah_model())
+    acm_cah_model()$method
   })
 
   # Reactive: Summary complet
@@ -244,8 +289,9 @@ acm_cah_server <- function(input, output, session, data, k, method, n_axes, illu
   # ========== OUTPUT: DENDROGRAM ==========
   output$acm_cah_dendro <- renderPlot({
     req(acm_cah_model())
+    req(k_value())
     tryCatch({
-      acm_cah_model()$plot_dendrogram(k = k())
+      acm_cah_model()$plot_dendrogram(k = k_value())
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
@@ -266,10 +312,11 @@ acm_cah_server <- function(input, output, session, data, k, method, n_axes, illu
   # ========== OUTPUT: FACTORIAL MAP (ACM only) ==========
   output$acm_cah_factmap <- renderPlot({
     req(acm_cah_model())
-    req(method() == "acm")
+    req(method_value() == "acm")
+    req(k_value())
 
     tryCatch({
-      acm_cah_model()$plot_factorial_map(dims = c(1, 2), k = k())
+      acm_cah_model()$plot_factorial_map(dims = c(1, 2), k = k_value())
     }, error = function(e) {
       plot.new()
       text(0.5, 0.5, paste("Error:", e$message), cex = 1.2, col = "red")
@@ -279,7 +326,7 @@ acm_cah_server <- function(input, output, session, data, k, method, n_axes, illu
   # ========== OUTPUT: SCREE PLOT (ACM only) ==========
   output$acm_cah_scree <- renderPlot({
     req(acm_cah_model())
-    req(method() == "acm")
+    req(method_value() == "acm")
 
     tryCatch({
       acm_cah_model()$plot_scree(cumulative = FALSE)
@@ -292,7 +339,7 @@ acm_cah_server <- function(input, output, session, data, k, method, n_axes, illu
   # ========== OUTPUT: CONTRIBUTIONS (ACM only) ==========
   output$acm_cah_contrib <- renderPlot({
     req(acm_cah_model())
-    req(method() == "acm")
+    req(method_value() == "acm")
 
     tryCatch({
       acm_cah_model()$plot_contrib(dim = 1, top = 15)
@@ -308,23 +355,19 @@ acm_cah_server <- function(input, output, session, data, k, method, n_axes, illu
   illustrative_results <- reactive({
     req(acm_cah_model())
 
-    if (!is.null(illustrative_vars) && !is.null(illustrative_vars())) {
-      illust_data <- illustrative_vars()
+    illust_data <- illustrative_data()
 
-      if (ncol(illust_data) > 0) {
-        tryCatch({
-          acm_cah_model()$illustrative(illust_data, plot = FALSE)
-        }, error = function(e) {
-          showNotification(
-            paste("Error in illustrative:", e$message),
-            type = "error",
-            duration = 10
-          )
-          NULL
-        })
-      } else {
+    if (!is.null(illust_data) && ncol(illust_data) > 0) {
+      tryCatch({
+        acm_cah_model()$illustrative(illust_data, plot = FALSE)
+      }, error = function(e) {
+        showNotification(
+          paste("Error in illustrative:", e$message),
+          type = "error",
+          duration = 10
+        )
         NULL
-      }
+      })
     } else {
       NULL
     }
@@ -349,7 +392,7 @@ acm_cah_server <- function(input, output, session, data, k, method, n_axes, illu
             div(
               style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
               h5("📊 Illustrative Modalities - Distance to Clusters", style = "color: #2d3748; font-weight: 600;"),
-              p(if (method() == "dice") {
+              p(if (method_value() == "dice") {
                 "Average Dice² distance to cluster members (lower = closer)"
               } else {
                 "Euclidean distance to cluster barycenters in MCA space (lower = closer)"
@@ -402,6 +445,60 @@ acm_cah_server <- function(input, output, session, data, k, method, n_axes, illu
   output$acm_cah_illustrative_plot <- renderPlot({
     req(illustrative_results())
     illustrative_results()$plot()
+  })
+
+  # ========== ILLUSTRATIVE NUMERIC (NOUVEAU!) ==========
+
+  illustrative_numeric_results <- reactive({
+    req(acm_cah_model())
+    req(method_value() == "acm")
+
+    illust_num <- illustrative_numeric_data()
+
+    if (!is.null(illust_num) && ncol(illust_num) > 0) {
+      tryCatch({
+        acm_cah_model()$illustrative_numeric(illust_num)
+      }, error = function(e) {
+        showNotification(paste("Error:", e$message), type = "error", duration = 10)
+        NULL
+      })
+    } else {
+      NULL
+    }
+  })
+
+  output$acm_cah_illustrative_numeric_content <- renderUI({
+    if (method_value() != "acm") {
+      div(
+        style = "text-align: center; padding: 40px; color: #718096;",
+        icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
+        br(), br(),
+        h5("Only available for ACM method", style = "color: #4a5568;")
+      )
+    } else if (is.null(illustrative_numeric_results())) {
+      div(
+        style = "text-align: center; padding: 40px; color: #718096;",
+        icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
+        br(), br(),
+        h5("No quantitative illustrative variables", style = "color: #4a5568;")
+      )
+    } else {
+      fluidRow(
+        column(
+          width = 12,
+          div(
+            style = "background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+            h5("📈 Correlation Circle", style = "color: #2d3748; font-weight: 600;"),
+            plotOutput("acm_cah_illustrative_numeric_plot", height = "500px")
+          )
+        )
+      )
+    }
+  })
+
+  output$acm_cah_illustrative_numeric_plot <- renderPlot({
+    req(illustrative_numeric_results())
+    illustrative_numeric_results()
   })
 
   # Return model for external use
