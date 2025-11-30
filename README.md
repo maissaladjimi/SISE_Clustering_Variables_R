@@ -21,7 +21,7 @@
 - [🔧Advanced Features](#-advanced-features)
 - [🎨 Shiny Application](#-shiny-application)
 - [🧪Tests](#-tests)
-- [🛠️ Package structure](#️-package-structure)
+- [📂 Package structure](#️-package-structure)
 - [❓ Getting Help](#-getting-help)
 - [👥 Authors](#-authors)
 - [📄 License](#-license)
@@ -545,8 +545,61 @@ print(results$R2_details)
 ```
 ---
 ## 🎨 Shiny Application
+
+An interactive web application is included to explore clustering methods without coding.
+```r
+# Navigate to the shiny directory
+setwd("path/to/SISE_Clustering_Variables_R/inst/shiny")
+
+# Run the application
+shiny::runApp()
+```
+
 ---
-content shiny 
+
+### 📸 Application Screenshots
+
+#### 🏠 Home Page
+Welcome interface introducing the three clustering methods (K-Means, VarClus, ACM-CAH) and their applications for variable clustering.
+
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/b0f2aa9d-2879-430d-857c-895bc7fcb284" />
+
+
+#### 📁 Data Import
+Upload your datasets (TXT,CSV, XLSX, XLS) with automatic preview, variable type detection, and data summary statistics.
+
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/8ca067bb-dee4-4ceb-870e-06da4c3b4646" />
+
+> Each of the following algorithms has 4 sections in which you can navigate : Summary, Visualizations, Detailed Stats, Illustratrive Variables 
+#### 📊 K-Means Clustering
+Perform K-Means clustering on quantitative variables with interactive visualizations including correlation circles, biplots, and elbow plots for optimal k selection.
+
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/a3882d7e-0f40-40ec-ab5e-8388052d5397" />
+
+
+#### 🎯 ACM-CAH Clustering
+Cluster qualitative variables using Multiple Correspondence Analysis (or Dice) combined with Hierarchical Clustering. Visualize dendrograms, factorial maps, and contribution plots.
+
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/c793260f-5b98-4c49-b63f-ecab59fbfdd9" />
+
+
+
+#### 🌳 VarClus Clustering
+Hierarchical divisive clustering for quantitative variables with dendrograms, heatmaps, and automatic optimal cluster detection.
+
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/9626d258-8ad2-4143-b787-902372173758" />
+
+---
+
+### 🎥 Video Demo
+
+Watch a complete demonstration of the application:
+
+**[📺 Application Demo Video](YOUR_VIDEO_LINK_HERE)**
+
+*(Video coming soon)*
+
+ 
 ---
 ## 🧪 Tests
 
@@ -594,10 +647,40 @@ testthat::test_file("tests/testthat/test-varclus.R")
 
 ---
 
-## 🛠️ Package structure 
+## 📂 Package structure 
 
 
-Add tree
+
+```
+ClusteringVariables/
+├── R/                          # R source code
+│   ├── clusterengine.R        # Unified wrapper class
+│   ├── kmeans.R               # K-Means algorithm (R6)
+│   ├── varclus.R              # VarClus algorithm (R6)
+│   ├── acm_cah.R              # ACM-CAH algorithm (R6)
+│   ├── n_clusters.R           # Elbow methods for optimal k
+│   ├── utils.R                # Utility functions
+│   ├── data.R                 # Dataset documentation
+│   └── run_app.R              # Shiny app launcher
+├── data/                       # Built-in datasets (.rda)
+├── data-raw/                   # Raw data and preparation scripts
+│   └── prepare_datasets.R
+├── inst/                       # Installed files
+│   └── shiny/                 # Shiny application
+│       ├── ui.R               # User interface
+│       ├── server.R           # Server logic
+│       ├── modules/           # Modular components
+│       │   ├── kmeans_module.R
+│       │   ├── acm_cah_module.R
+│       │   └── varclus_module.R
+│       └── www/               # Static assets (images, CSS)
+├── man/                        # Documentation (auto-generated)
+├── tests/                      # Unit tests (testthat)
+├── DESCRIPTION                 # Package metadata
+├── NAMESPACE                   # Exports (auto-generated)
+├── LICENSE                     # MIT License
+└── README.md                   # This file
+```
 
 ---
 
