@@ -111,7 +111,7 @@ varclus_elbow <- function(X_num, similarity = "spearman") {
   if (ncol(X_num) < 2) stop("Need at least 2 numeric variables")
 
   # Run VarClus
-  vc <- Hmisc::varclus(x = X_num, similarity = similarity)
+  vc <- Hmisc::varclus(x = as.matrix(X_num), similarity = similarity)
   hc <- vc$hclust
   max_k <- ncol(X_num) - 1
 

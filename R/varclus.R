@@ -156,7 +156,7 @@ VarClus <- R6::R6Class(
       if (ncol(X_num) < 2) stop("At least two numeric variables are required")
 
       # Run VarClus
-      self$model <- Hmisc::varclus(x = X_num, similarity = self$similarity)
+      self$model <- Hmisc::varclus(x = as.matrix(X_num), similarity = self$similarity)
 
       # Run elbow method
       if (!exists("varclus_elbow")) stop("Function varclus_elbow() not found")
