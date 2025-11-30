@@ -282,7 +282,12 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
         'cluster',
         backgroundColor = styleEqual(
           unique(clusters_df$cluster),
-          rainbow(length(unique(clusters_df$cluster)))
+          grDevices::colorRampPalette(c(
+            "#1f77b4", "#ff7f0e", "#2ca02c",
+            "#d62728", "#9467bd", "#8c564b",
+            "#e377c2", "#7f7f7f", "#bcbd22",
+            "#17becf"
+          ))(length(unique(clusters_df$cluster)))
         )
       )
   })
@@ -444,7 +449,12 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
         'cluster_assigned',
         backgroundColor = styleEqual(
           unique(illustrative_results()$table$cluster_assigned),
-          rainbow(length(unique(illustrative_results()$table$cluster_assigned)))
+          grDevices::colorRampPalette(c(
+            "#1f77b4", "#ff7f0e", "#2ca02c",
+            "#d62728", "#9467bd", "#8c564b",
+            "#e377c2", "#7f7f7f", "#bcbd22",
+            "#17becf"
+          ))(length(unique(illustrative_results()$table$cluster_assigned)))
         )
       )
   })
@@ -485,6 +495,66 @@ acm_cah_server <- function(engine_reactive, input = NULL, output = NULL, session
       )
       NULL
     })
+  })
+
+  # --------- UI dynamique pour les variables illustratives quantitatives ---------
+  output$acm_cah_illustrative_numeric_content <- renderUI({
+    # Si on n'est pas en ACM : on affiche juste un message
+    if (method_value() != "acm") {
+      return(
+        div(
+          style = "text-align: center; padding: 40px; color = #718096;",
+          icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
+          br(), br(),
+          h5("Quantitative illustrative variables are only available for MCA method",
+             style = "color: #4a5568;"),
+          p("Switch to 'MCA + CAH' in the sidebar to see this section.",
+            style = "font-size: 14px;")
+        )
+      )
+    }
+
+    cors <- illustrative_numeric_results()
+
+    # Aucun résultat (pas de variables illustratives quantitatives)
+    if (is.null(cors)) {
+      return(
+        div(
+          style = "text-align: center; padding: 40px; color: #718096;",
+          icon("info-circle", class = "fa-3x", style = "color: #cbd5e0;"),
+          br(), br(),
+          h5("No quantitative illustrative variables", style = "color: #4a5568;"),
+          p("Select at least one numeric illustrative variable in the sidebar.",
+            style = "font-size: 14px;")
+        )
+      )
+    }
+
+    # Sinon : on affiche le cercle + la table
+    tagList(
+      fluidRow(
+        column(
+          width = 6,
+          div(
+            style = "background: white; padding: 15px; border-radius: 8px;
+                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+            h5("📈 Correlation Circle",
+               style = "color: #2d3748; font-weight: 600;"),
+            plotOutput("acm_cah_illustrative_numeric_plot", height = "450px")
+          )
+        ),
+        column(
+          width = 6,
+          div(
+            style = "background: white; padding: 15px; border-radius: 8px;
+                     box-shadow: 0 2px 8px rgba(0,0,0,0.1);",
+            h5("📋 Correlations summary",
+               style = "color: #2d3748; font-weight: 600;"),
+            DTOutput("acm_cah_illustrative_numeric_table")
+          )
+        )
+      )
+    )
   })
 
   output$acm_cah_illustrative_numeric_plot <- renderPlot({

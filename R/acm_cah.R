@@ -233,7 +233,14 @@ ClustModalities <- R6::R6Class(
 
       kk <- if (!is.null(k)) k else self$k
       if (!is.null(kk))
-        rect.hclust(self$hclust, k = kk, border = 2:(kk+1))
+        dark_cols <- grDevices::colorRampPalette(c(
+          "#1f77b4", "#ff7f0e", "#2ca02c",
+          "#d62728", "#9467bd", "#8c564b",
+          "#e377c2", "#7f7f7f", "#bcbd22",
+          "#17becf"
+        ))(kk)
+
+      rect.hclust(self$hclust, k = kk, border = dark_cols)
     },
 
     # =====================================================================
