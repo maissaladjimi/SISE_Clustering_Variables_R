@@ -37,7 +37,7 @@ server <- function(input, output, session) {
           showNotification("Package 'readxl' required. Installing...", type = "warning", duration = 5)
           install.packages("readxl")
         }
-        df <- readxl::read_excel(input$file1$datapath)
+        df <- as.data.frame(readxl::read_excel(input$file1$datapath))
       } else {
         df <- read.csv(input$file1$datapath, header = input$header, sep = input$sep, quote = input$quote, dec = ",")
       }
@@ -211,6 +211,14 @@ server <- function(input, output, session) {
     updateSelectInput(session, "active_vars",
                       choices = setdiff(names(df), input$illustrative_vars),
                       selected = intersect(input$active_vars, setdiff(names(df), input$illustrative_vars)))
+  })
+
+  observeEvent(input$auto_k, {
+    if (input$auto_k) {
+      shinyjs::disable("num_k")  # Figer le slider
+    } else {
+      shinyjs::enable("num_k")   # Réactiver le slider
+    }
   })
 
   # ============================================================================
