@@ -1,19 +1,19 @@
-# =============================================================================
+# ==============================================================================
 # inst/shiny/server.R
-# Logique serveur - VERSION CORRIGÉE FINALE
-# =============================================================================
+# Server logic - Clustering Variables Shiny App
+# ==============================================================================
 
 library(shiny)
 library(DT)
 library(shinyjs)
 
-# Charger les classes R6
+# Load R6 classes
 source("../../R/n_clusters.R")
 source("../../R/kmeans.R")
 source("../../R/acm_cah.R")
 source("../../R/varclus.R")
 
-# Charger les modules Shiny
+# Load Shiny modules
 source("modules/kmeans_module.R")
 source("modules/acm_cah_module.R")
 source("modules/varclus_module.R")
@@ -22,9 +22,9 @@ server <- function(input, output, session) {
 
   datasets <- reactiveValues(data = list())
 
-  # ===========================================================================
-  # REACTIVE: Preview des données uploadées
-  # ===========================================================================
+  # ============================================================================
+  # REACTIVE: Preview uploaded data
+  # ============================================================================
 
   preview_data <- reactive({
     req(input$file1)
@@ -34,7 +34,7 @@ server <- function(input, output, session) {
 
       if (file_ext %in% c("xlsx", "xls")) {
         if (!requireNamespace("readxl", quietly = TRUE)) {
-          showNotification("Package 'readxl' requis. Installation...", type = "warning", duration = 5)
+          showNotification("Package 'readxl' required. Installing...", type = "warning", duration = 5)
           install.packages("readxl")
         }
         df <- readxl::read_excel(input$file1$datapath)
@@ -42,6 +42,7 @@ server <- function(input, output, session) {
         df <- read.csv(input$file1$datapath, header = input$header, sep = input$sep, quote = input$quote, dec = ",")
       }
 
+      # Auto-convert character columns to numeric if possible
       for (col in names(df)) {
         if (is.character(df[[col]])) {
           test_numeric <- gsub(",", ".", df[[col]])
@@ -52,14 +53,14 @@ server <- function(input, output, session) {
       }
       df
     }, error = function(e) {
-      showNotification(paste("Erreur de lecture:", e$message), type = "error", duration = 10)
+      showNotification(paste("Read error:", e$message), type = "error", duration = 10)
       NULL
     })
   })
 
-  # ===========================================================================
-  # OUTPUT: Afficher la preview des données (AMÉLIORÉE - style ta camarade)
-  # ===========================================================================
+  # ============================================================================
+  # OUTPUT: Display data preview
+  # ============================================================================
 
   output$data_preview <- renderUI({
     if (is.null(input$file1)) {
@@ -157,9 +158,9 @@ server <- function(input, output, session) {
     head(preview_data(), 10)
   }, striped = TRUE, hover = TRUE, bordered = TRUE)
 
-  # ===========================================================================
-  # OBSERVER: Sauvegarder le dataset
-  # ===========================================================================
+  # ============================================================================
+  # OBSERVER: Save dataset
+  # ============================================================================
 
   save_msg <- reactiveVal(NULL)
 
@@ -173,16 +174,16 @@ server <- function(input, output, session) {
       div(
         style = "color: #28a745; font-weight: bold; margin-top: 10px; padding: 10px;
                  background-color: #d4edda; border-radius: 5px; border: 1px solid #c3e6cb;",
-        icon("check-circle"), HTML(" Dataset enregistré avec succès !")
+        icon("check-circle"), HTML(" Dataset saved successfully!")
       )
     )
   })
 
   output$save_msg <- renderUI({ save_msg() })
 
-  # ===========================================================================
-  # OBSERVER: Mettre à jour les sélecteurs de variables
-  # ===========================================================================
+  # ============================================================================
+  # OBSERVER: Update variable selectors
+  # ============================================================================
 
   observeEvent(input$dataset_choice, {
     req(datasets$data)
@@ -212,66 +213,53 @@ server <- function(input, output, session) {
                       selected = intersect(input$active_vars, setdiff(names(df), input$illustrative_vars)))
   })
 
-  observe({
-    if (isTRUE(input$auto_k)) { disable("num_k") } else { enable("num_k") }
-  })
-
-  selected_data <- reactive({
-    req(input$dataset_choice)
-    datasets$data[[input$dataset_choice]]
-  })
-
-  # ===========================================================================
-  # REACTIVE: clustering_engine (AVEC CORRECTIONS)
-  # ===========================================================================
+  # ============================================================================
+  # REACTIVE: Main clustering engine
+  # ============================================================================
 
   clustering_engine <- eventReactive(input$run_clustering, {
 
-    req(selected_data(), input$active_vars)
+    req(input$dataset_choice, input$active_vars, input$algorithm)
 
-    if (length(input$active_vars) < 2) {
-      showNotification("Veuillez sélectionner au moins 2 variables actives", type = "error", duration = 5)
-      return(NULL)
-    }
-
-    df <- selected_data()
+    df <- datasets$data[[input$dataset_choice]]
     X <- df[, input$active_vars, drop = FALSE]
 
-    # =========================================================================
+    # ===========================================================================
     # K-MEANS
-    # =========================================================================
+    # ===========================================================================
 
     if (!is.null(input$algorithm) && input$algorithm == "kmeans") {
-      if (!all(sapply(X, is.numeric))) {
-        showNotification("K-means nécessite uniquement des variables quantitatives", type = "error", duration = 5)
+
+      numeric_cols <- sapply(X, is.numeric)
+      quant_data <- X[, numeric_cols, drop = FALSE]
+
+      if (ncol(quant_data) == 0) {
+        showNotification("K-means requires at least one quantitative variable", type = "error", duration = 5)
         return(NULL)
       }
 
-      withProgress(message = "Clustering en cours...", {
+      if (ncol(quant_data) < 2) {
+        showNotification("K-means requires at least 2 quantitative variables", type = "error", duration = 5)
+        return(NULL)
+      }
+
+      withProgress(message = "K-means in progress...", {
 
         if (input$auto_k) {
-          setProgress(0.2, detail = "Détection automatique de k...")
-
-          km_temp <- KMeansVariablesQuant$new(k = 2, max_iter = 100, n_init = 10, seed = 42)
-          km_temp$fit(X)
-
-          # ✅ CORRECTION A: Retirer n_init de elbow()
-          elbow_res <- km_temp$elbow(
-            k_range = 2:min(10, ncol(X)),
-            plot = FALSE
-          )
+          setProgress(0.2, detail = "Automatic k detection...")
+          elbow_res <- kmeans_elbow(X_num = quant_data, k_range = 2:10, seed = NULL)
           k_opt <- elbow_res$optimal_k
-
-          showNotification(paste("✅ K-means: k optimal détecté =", k_opt), type = "message", duration = 5)
-
-          km <- KMeansVariablesQuant$new(k = k_opt, max_iter = 100, n_init = 10, seed = 42)
+          showNotification(paste("✅ K-means: optimal k detected =", k_opt), type = "message", duration = 5)
         } else {
-          km <- KMeansVariablesQuant$new(k = input$num_k, max_iter = 100, n_init = 10, seed = 42)
+          k_opt <- input$num_k
         }
 
-        setProgress(0.7, detail = "Ajustement du modèle...")
-        km$fit(X)
-        setProgress(1, detail = "Terminé !")
+        setProgress(0.5, detail = "Building model...")
+
+        km <- KMeansVariablesQuant$new(k = k_opt, seed = 42)
+        km$fit(quant_data)
+
+        setProgress(1, detail = "Done!")
       })
 
       result <- list(model = km, type = "kmeans")
@@ -279,6 +267,7 @@ server <- function(input, output, session) {
       if (!is.null(input$illustrative_vars) && length(input$illustrative_vars) > 0) {
         X_illust <- df[, input$illustrative_vars, drop = FALSE]
         X_illust_num <- X_illust[, sapply(X_illust, is.numeric), drop = FALSE]
+
         if (ncol(X_illust_num) > 0) {
           result$illustrative <- X_illust_num
         }
@@ -286,43 +275,42 @@ server <- function(input, output, session) {
 
       result
 
-      # =========================================================================
+      # ===========================================================================
       # ACM-CAH
-      # =========================================================================
+      # ===========================================================================
 
     } else if (!is.null(input$algorithm) && input$algorithm == "acm_cah") {
 
-      quali_data <- X[, sapply(X, is.factor) | sapply(X, is.character), drop = FALSE]
-
-      if (ncol(quali_data) > 0) {
-        quali_data[] <- lapply(quali_data, factor)
-      }
+      quali_cols <- sapply(X, function(x) is.factor(x) || is.character(x))
+      quali_data <- X[, quali_cols, drop = FALSE]
 
       if (ncol(quali_data) == 0) {
-        showNotification("ACM-CAH nécessite au moins une variable qualitative", type = "error", duration = 5)
+        showNotification("ACM-CAH requires at least one qualitative variable", type = "error", duration = 5)
         return(NULL)
       }
 
-      withProgress(message = "ACM-CAH en cours...", {
+      quali_data[] <- lapply(quali_data, factor)
+
+      withProgress(message = "ACM-CAH in progress...", {
 
         if (input$auto_k) {
-          setProgress(0.2, detail = "Détection automatique de k...")
-
-          elbow_res <- acm_cah_elbow(X_quali = quali_data, method = input$acm_cah_method,
-                                     k_max = min(10, nrow(quali_data)))
-
+          setProgress(0.2, detail = "Automatic k detection...")
+          elbow_res <- acm_cah_elbow(
+            X_quali = quali_data,
+            method = input$acm_cah_method,
+            k_max = 10
+          )
           k_opt <- elbow_res$optimal_k
-          suggested <- elbow_res$suggested_k
-
           showNotification(
-            paste0("✅ ACM-CAH: k optimal = ", k_opt, " (k suggérés: ", paste(suggested, collapse = ", "), ")"),
-            type = "message", duration = 8
+            paste("✅ ACM-CAH: optimal k detected =", k_opt),
+            type = "message",
+            duration = 5
           )
         } else {
           k_opt <- input$num_k
         }
 
-        setProgress(0.5, detail = "Construction du modèle...")
+        setProgress(0.5, detail = "Building model...")
 
         cm <- ClustModalities$new(
           method = input$acm_cah_method,
@@ -331,12 +319,12 @@ server <- function(input, output, session) {
 
         cm$fit(quali_data, k = k_opt)
 
-        setProgress(1, detail = "Terminé !")
+        setProgress(1, detail = "Done!")
       })
 
       result <- list(model = cm, type = "acm_cah")
 
-      # Variables illustratives QUALITATIVES
+      # Illustrative QUALITATIVE variables
       if (!is.null(input$illustrative_vars) && length(input$illustrative_vars) > 0) {
         X_illust <- df[, input$illustrative_vars, drop = FALSE]
         X_illust_quali <- X_illust[, sapply(X_illust, function(x) is.factor(x) | is.character(x)), drop = FALSE]
@@ -346,7 +334,7 @@ server <- function(input, output, session) {
           result$illustrative <- X_illust_quali
         }
 
-        # ✅ CORRECTION B: Ajouter AUSSI variables illustratives QUANTITATIVES
+        # Also add QUANTITATIVE illustrative variables
         X_illust_quant <- X_illust[, sapply(X_illust, is.numeric), drop = FALSE]
         if (ncol(X_illust_quant) > 0) {
           result$illustrative_numeric <- X_illust_quant
@@ -355,9 +343,9 @@ server <- function(input, output, session) {
 
       result
 
-      # =========================================================================
+      # ===========================================================================
       # VARCLUS
-      # =========================================================================
+      # ===========================================================================
 
     } else if (!is.null(input$algorithm) && input$algorithm == "varclus") {
 
@@ -365,35 +353,35 @@ server <- function(input, output, session) {
       quant_data <- X[, numeric_cols, drop = FALSE]
 
       if (ncol(quant_data) == 0) {
-        showNotification("VarClus nécessite au moins une variable quantitative", type = "error", duration = 5)
+        showNotification("VarClus requires at least one quantitative variable", type = "error", duration = 5)
         return(NULL)
       }
 
       if (ncol(quant_data) < 2) {
-        showNotification("VarClus nécessite au moins 2 variables quantitatives", type = "error", duration = 5)
+        showNotification("VarClus requires at least 2 quantitative variables", type = "error", duration = 5)
         return(NULL)
       }
 
       quant_data <- as.matrix(quant_data)
       mode(quant_data) <- "numeric"
 
-      withProgress(message = "VarClus en cours...", {
+      withProgress(message = "VarClus in progress...", {
 
         if (input$auto_k) {
-          setProgress(0.2, detail = "Détection automatique de k...")
+          setProgress(0.2, detail = "Automatic k detection...")
           elbow_res <- varclus_elbow(X_num = quant_data, similarity = "pearson")
           k_opt <- elbow_res$optimal_k
-          showNotification(paste("✅ VarClus: k optimal détecté =", k_opt), type = "message", duration = 5)
+          showNotification(paste("✅ VarClus: optimal k detected =", k_opt), type = "message", duration = 5)
         } else {
           k_opt <- input$num_k
         }
 
-        setProgress(0.5, detail = "Construction du modèle...")
+        setProgress(0.5, detail = "Building model...")
 
         vc <- VarClus$new(similarity = "pearson", n_clusters = k_opt)
         vc$fit(quant_data)
 
-        setProgress(1, detail = "Terminé !")
+        setProgress(1, detail = "Done!")
       })
 
       result <- list(model = vc, type = "varclus")
@@ -411,26 +399,26 @@ server <- function(input, output, session) {
       result
 
     } else {
-      showNotification("Algorithme non implémenté", type = "warning")
+      showNotification("Algorithm not implemented", type = "warning")
       NULL
     }
   })
 
-  # ===========================================================================
-  # MODULE SERVEUR: Appel des modules
-  # ===========================================================================
+  # ============================================================================
+  # MODULE SERVER: Call modules
+  # ============================================================================
 
   kmeansServer("kmeans_tab", engine_reactive = clustering_engine)
   acm_cah_server(engine_reactive = clustering_engine)
   varclus_server(engine_reactive = clustering_engine)
 
-  # ===========================================================================
-  # OUTPUT: Affichage conditionnel clustering (NOUVEAU!)
-  # ===========================================================================
+  # ============================================================================
+  # OUTPUT: Conditional clustering display
+  # ============================================================================
 
   output$clustering_output <- renderUI({
 
-    # Si aucun clustering lancé, afficher message d'accueil
+    # If no clustering launched, display welcome message
     if (is.null(input$run_clustering) || input$run_clustering == 0) {
       return(
         div(
@@ -500,7 +488,7 @@ server <- function(input, output, session) {
       )
     }
 
-    # Si clustering lancé, afficher seulement le tab sélectionné
+    # If clustering launched, display only selected tab
     req(input$run_clustering > 0)
 
     if (input$algorithm == "kmeans") {

@@ -2,20 +2,53 @@
 % Please edit documentation in R/n_clusters.R
 \name{acm_cah_elbow}
 \alias{acm_cah_elbow}
-\title{Determine optimal number of clusters K using elbow method (ACM-CAH)}
+\title{Determine Optimal Number of Clusters for ACM-CAH}
 \usage{
 acm_cah_elbow(X_quali, method = "acm", k_max = 10)
 }
 \arguments{
-\item{X_quali}{Qualitative data (data.frame with factors)}
+\item{X_quali}{Data frame with categorical variables (factors)}
 
-\item{method}{"dice" or "acm" (default: "acm")}
+\item{method}{Clustering method: "dice" or "acm" (default: "acm")}
 
-\item{k_max}{Maximum number of clusters to consider (default: 10)}
+\item{k_max}{Maximum number of clusters to test (default: 10)}
 }
 \value{
-List with optimal_k, plot function, results data.frame
+List containing:
+\item{optimal_k}{Recommended number of clusters}
+\item{results}{Data frame with k, height, and marginal gain}
+\item{suggested_k}{Top 3 k values based on marginal gain}
+\item{plot}{Function to generate dual elbow plots (height + gain)}
 }
 \description{
-Determine optimal number of clusters K using elbow method (ACM-CAH)
+Automatically selects the optimal number of clusters for categorical
+variable clustering (ACM-CAH or DICE method) using the elbow method
+based on dendrogram heights.
+}
+\details{
+For hierarchical clustering, the optimal k corresponds to the largest
+"jump" in the dendrogram, i.e., the maximum marginal gain:
+\deqn{gain(k) = height(k-1) - height(k)}
+
+The algorithm:
+\enumerate{
+\item Fits ACM-CAH or DICE hierarchical clustering
+\item Extracts dendrogram heights for k = 1 to k_max
+\item Calculates marginal gain (reduction in height) for each k
+\item Selects k with maximum gain as optimal
+}
+}
+\examples{
+\dontrun{
+# Automatic k selection for ACM-CAH
+data <- data.frame(
+  var1 = factor(sample(c("A", "B", "C"), 100, replace = TRUE)),
+  var2 = factor(sample(c("X", "Y", "Z"), 100, replace = TRUE))
+)
+result <- acm_cah_elbow(data, method = "acm", k_max = 10)
+print(result$optimal_k)
+print(result$suggested_k)
+result$plot()
+}
+
 }

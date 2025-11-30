@@ -1,6 +1,6 @@
 # =============================================================================
 # inst/shiny/ui.R
-# Interface utilisateur de l'application Shiny
+# User Interface - Clustering Variables Shiny App
 # =============================================================================
 
 library(shiny)
@@ -8,13 +8,13 @@ library(shinyjs)
 library(shinythemes)
 library(DT)
 
-# Charger les modules
+# Load Shiny modules
 source("modules/kmeans_module.R")
 source("modules/acm_cah_module.R")
 source("modules/varclus_module.R")
 
 # =============================================================================
-# INTERFACE UTILISATEUR (navbarPage)
+# USER INTERFACE (navbarPage)
 # =============================================================================
 
 ui <- navbarPage(
@@ -23,7 +23,7 @@ ui <- navbarPage(
   theme = shinytheme("cosmo"),
 
   # ===========================================================================
-  # ONGLET 1 : HOME
+  # TAB 1 : HOME
   # ===========================================================================
   tabPanel(
     "Home",
@@ -149,7 +149,7 @@ ui <- navbarPage(
   ),
 
   # ===========================================================================
-  # ONGLET 2 : DATA IMPORT
+  # TAB 2 : DATA IMPORT
   # ===========================================================================
   tabPanel(
     "Data Import",
@@ -326,7 +326,7 @@ ui <- navbarPage(
   ),
 
   # ===========================================================================
-  # ONGLET 3 : CLUSTERING
+  # TAB 3 : CLUSTERING
   # ===========================================================================
   tabPanel(
     "Clustering",

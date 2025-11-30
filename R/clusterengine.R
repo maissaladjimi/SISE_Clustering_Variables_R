@@ -129,6 +129,10 @@ ClusterEngine <- R6::R6Class(
       return(self$model)
     },
 
+    #' @description Compute elbow plot for optimal k selection
+    #' @param k_range Range of k values to test (default: 2:10)
+    #' @param plot Logical, whether to display the plot (default: TRUE)
+    #' @return Elbow analysis results (invisibly)
     elbow = function(k_range = 2:10, plot = TRUE) {
       if (is.null(self$data))
         stop("Data not provided.")

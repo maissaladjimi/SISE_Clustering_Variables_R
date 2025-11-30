@@ -2,11 +2,236 @@
 % Please edit documentation in R/acm_cah.R
 \name{ClustModalities}
 \alias{ClustModalities}
-\title{Elbow method with automatic detection of optimal k}
+\title{Clustering of Qualitative Variables (Modalities)}
 \description{
-Elbow method with automatic detection of optimal k
+Implements clustering of categorical variable modalities using two methods:
+\itemize{
+\item \strong{DICE}: Distance-based clustering using Dice² distance
+\item \strong{ACM}: Multiple Correspondence Analysis (MCA) followed by hierarchical clustering
+}
+}
+\details{
+The class provides two distinct approaches for clustering qualitative modalities:
 
-Elbow method with automatic detection of optimal k
+\strong{DICE Method}:
+\enumerate{
+\item Compute disjunctive table (indicator matrix) of modalities
+\item Calculate Dice² distance between all pairs of modalities
+\item Apply hierarchical clustering with Ward's linkage (ward.D2)
+}
+
+\strong{ACM Method}:
+\enumerate{
+\item Perform Multiple Correspondence Analysis (MCA) on disjunctive table
+\item Scale coordinates by sqrt(eigenvalues)
+\item Apply hierarchical clustering on factorial coordinates (ward.D)
+\item Optional Benzecri and Greenacre corrections for eigenvalues
+}
+}
+\section{Distance Metrics}{
+
+
+\strong{Dice² distance}:
+\deqn{d_{Dice}^2(m_j, m_{j'}) = \frac{1}{2} \sum_{i=1}^n (x_{ij} - x_{ij'})^2}
+where \eqn{x_{ij}} is the indicator (0/1) for individual \eqn{i} and modality \eqn{j}.
+
+\strong{Euclidean distance on MCA coordinates}:
+\deqn{d_{MCA}(m_j, m_{j'}) = \sqrt{\sum_{s=1}^S (\phi_s \cdot f_{js} - \phi_s \cdot f_{j's})^2}}
+where \eqn{f_{js}} are the factorial coordinates and \eqn{\phi_s = \sqrt{\lambda_s}}
+are the scaling factors.
+}
+
+\section{Illustrative Variables}{
+
+The class supports two types of illustrative variables:
+\itemize{
+\item \strong{Qualitative}: Use \code{illustrative()} to project categorical variables
+\item \strong{Quantitative}: Use \code{illustrative_numeric()} to display correlation circle (ACM only)
+}
+}
+
+\examples{
+\dontrun{
+# Example with categorical data
+data(mtcars)
+mtcars_quali <- data.frame(
+  cyl = factor(mtcars$cyl),
+  vs = factor(mtcars$vs),
+  am = factor(mtcars$am),
+  gear = factor(mtcars$gear),
+  carb = factor(mtcars$carb)
+)
+
+# DICE method
+cm_dice <- ClustModalities$new(method = "dice")
+cm_dice$fit(mtcars_quali, k = 3)
+cm_dice$print()
+cm_dice$plot_dendrogram()
+
+# ACM method with automatic k selection
+cm_acm <- ClustModalities$new(method = "acm", n_axes = 5)
+cm_acm$fit(mtcars_quali, k = 3)
+cm_acm$summary()
+
+# Visualizations (ACM only)
+cm_acm$plot_factorial_map(dims = c(1, 2))
+cm_acm$plot_scree()
+cm_acm$plot_contrib(dim = 1, top = 10)
+
+# Predict new observations
+new_data <- data.frame(
+  cyl = factor(c(6, 8)),
+  vs = factor(c(0, 1)),
+  am = factor(c(1, 0)),
+  gear = factor(c(4, 3)),
+  carb = factor(c(2, 4))
+)
+predictions <- cm_acm$predict(new_data)
+
+# Illustrative qualitative variables
+illust_quali <- data.frame(
+  new_var = factor(sample(c("A", "B", "C"), nrow(mtcars), replace = TRUE))
+)
+illust_results <- cm_acm$illustrative(illust_quali)
+
+# Illustrative quantitative variables (correlation circle)
+illust_quant <- mtcars[, c("mpg", "hp", "wt")]
+cm_acm$illustrative_numeric(illust_quant, plot = TRUE)
+}
+
+
+## ------------------------------------------------
+## Method `ClustModalities$fit`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+}
+
+## ------------------------------------------------
+## Method `ClustModalities$plot_dendrogram`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_dendrogram(k = 3)
+}
+
+## ------------------------------------------------
+## Method `ClustModalities$plot_factorial_map`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_factorial_map(dims = c(1, 2), k = 3)
+}
+
+## ------------------------------------------------
+## Method `ClustModalities$plot_scree`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_scree()
+cm$plot_scree(cumulative = TRUE)
+}
+
+## ------------------------------------------------
+## Method `ClustModalities$plot_contrib`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_contrib(dim = 1, top = 10)
+}
+
+## ------------------------------------------------
+## Method `ClustModalities$illustrative_numeric`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+quant_vars <- data.frame(x = rnorm(nrow(vote)), y = rnorm(nrow(vote)))
+cors <- cm$illustrative_numeric(quant_vars, plot = TRUE)
+}
+
+## ------------------------------------------------
+## Method `ClustModalities$illustrative`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+illust_vars <- data.frame(extra = factor(sample(c("A", "B"), nrow(vote), replace = TRUE)))
+illust_results <- cm$illustrative(illust_vars, plot = TRUE)
+}
+
+## ------------------------------------------------
+## Method `ClustModalities$predict`
+## ------------------------------------------------
+
+\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+new_data <- vote[1:5, ]
+predictions <- cm$predict(new_data)
+}
+}
+\references{
+\itemize{
+\item Chavent, M., Kuentz-Simonet, V., Labenne, A., & Saracco, J. (2012).
+ClustOfVar: An R Package for the Clustering of Variables.
+Journal of Statistical Software, 50(13), 1-16.
+\item Husson, F., Lê, S., & Pagès, J. (2017). Exploratory Multivariate Analysis
+by Example Using R (2nd ed.). Chapman and Hall/CRC.
+}
+}
+\section{Public fields}{
+\if{html}{\out{<div class="r6-fields">}}
+\describe{
+\item{\code{data}}{Original data.frame of categorical variables}
+
+\item{\code{disj}}{Disjunctive table (indicator matrix of modalities)}
+
+\item{\code{method}}{Clustering method: "dice" or "acm"}
+
+\item{\code{n_axes}}{Number of MCA axes to retain (ACM method only)}
+
+\item{\code{acm}}{MCA result object from ade4::dudi.coa()}
+
+\item{\code{eig_raw}}{Raw eigenvalues from MCA}
+
+\item{\code{eig_benzecri}}{Benzecri-corrected eigenvalues}
+
+\item{\code{eig_greenacre}}{Greenacre-corrected eigenvalues}
+
+\item{\code{ind_coords}}{Individual coordinates on MCA axes}
+
+\item{\code{mod_coords}}{Modality coordinates on MCA axes}
+
+\item{\code{dist_mat}}{Distance matrix between modalities}
+
+\item{\code{hclust}}{Hierarchical clustering object (hclust)}
+
+\item{\code{k}}{Number of clusters}
+
+\item{\code{mod_clusters}}{Cluster assignments for each modality}
+}
+\if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -19,14 +244,16 @@ Elbow method with automatic detection of optimal k
 \item \href{#method-ClustModalities-plot_elbow}{\code{ClustModalities$plot_elbow()}}
 \item \href{#method-ClustModalities-elbow}{\code{ClustModalities$elbow()}}
 \item \href{#method-ClustModalities-plot_dendrogram}{\code{ClustModalities$plot_dendrogram()}}
-\item \href{#method-ClustModalities-plot_factor_map}{\code{ClustModalities$plot_factor_map()}}
+\item \href{#method-ClustModalities-plot_factorial_map}{\code{ClustModalities$plot_factorial_map()}}
 \item \href{#method-ClustModalities-plot_scree}{\code{ClustModalities$plot_scree()}}
 \item \href{#method-ClustModalities-plot_contrib}{\code{ClustModalities$plot_contrib()}}
-\item \href{#method-ClustModalities-project_numeric}{\code{ClustModalities$project_numeric()}}
+\item \href{#method-ClustModalities-illustrative_numeric}{\code{ClustModalities$illustrative_numeric()}}
+\item \href{#method-ClustModalities-illustrative}{\code{ClustModalities$illustrative()}}
 \item \href{#method-ClustModalities-cluster_table}{\code{ClustModalities$cluster_table()}}
 \item \href{#method-ClustModalities-predict}{\code{ClustModalities$predict()}}
 \item \href{#method-ClustModalities-print}{\code{ClustModalities$print()}}
 \item \href{#method-ClustModalities-summary}{\code{ClustModalities$summary()}}
+\item \href{#method-ClustModalities-get_clusters_table}{\code{ClustModalities$get_clusters_table()}}
 \item \href{#method-ClustModalities-clone}{\code{ClustModalities$clone()}}
 }
 }
@@ -34,35 +261,95 @@ Elbow method with automatic detection of optimal k
 \if{html}{\out{<a id="method-ClustModalities-new"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-new}{}}}
 \subsection{Method \code{new()}}{
+Create a new ClustModalities object
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$new(method = c("dice", "acm"), n_axes = NULL)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{method}}{Clustering method: "dice" or "acm" (default: "dice")}
+
+\item{\code{n_axes}}{Number of MCA axes to retain (default: NULL = automatic)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A new \code{ClustModalities} object
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-check_data"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-check_data}{}}}
 \subsection{Method \code{check_data()}}{
+Validate input data (convert to factors)
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$check_data(X)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X}}{Data frame with categorical variables}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Validated data.frame with factor columns
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-compute_dice_distances"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-compute_dice_distances}{}}}
 \subsection{Method \code{compute_dice_distances()}}{
+Compute Dice² distance matrix
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$compute_dice_distances(disj_mat)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{disj_mat}}{Disjunctive table (indicator matrix)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Distance object (dist)
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-fit"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-fit}{}}}
 \subsection{Method \code{fit()}}{
+Fit the clustering model on categorical data
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$fit(X, k = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X}}{Data frame with categorical variables}
+
+\item{\code{k}}{Number of clusters (optional, can be determined later)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Self (invisibly) for method chaining
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -70,24 +357,47 @@ Elbow method with automatic detection of optimal k
 \if{html}{\out{<a id="method-ClustModalities-compute_elbow"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-compute_elbow}{}}}
 \subsection{Method \code{compute_elbow()}}{
+Compute elbow curve for optimal k selection
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$compute_elbow(k_max = NULL)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{k_max}}{Maximum number of clusters to test (default: NULL = 10)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Data frame with k values and aggregation heights
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-plot_elbow"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-plot_elbow}{}}}
 \subsection{Method \code{plot_elbow()}}{
+Plot elbow curve
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$plot_elbow(k_max = NULL)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{k_max}}{Maximum number of clusters to display}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Data frame (invisibly)
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-elbow"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-elbow}{}}}
 \subsection{Method \code{elbow()}}{
+Elbow method with automatic detection of optimal k
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$elbow(k_max = 10, plot = TRUE)}\if{html}{\out{</div>}}
 }
@@ -95,31 +405,83 @@ Elbow method with automatic detection of optimal k
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{k_max}}{Maximum number of clusters to consider (default: 10)}
+\item{\code{k_max}}{Maximum k to test (default: 10)}
 
 \item{\code{plot}}{Logical, whether to display the plot (default: TRUE)}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-List with optimal_k, results data.frame, and plot function
+List with optimal_k, results, and plot function
 }
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-plot_dendrogram"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-plot_dendrogram}{}}}
 \subsection{Method \code{plot_dendrogram()}}{
+Plot dendrogram with optional cluster coloring
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$plot_dendrogram(k = NULL, ...)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{k}}{Number of clusters to highlight (default: NULL = use self$k)}
+
+\item{\code{...}}{Additional arguments passed to plot()}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+NULL (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_dendrogram(k = 3)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-ClustModalities-plot_factor_map"></a>}}
-\if{latex}{\out{\hypertarget{method-ClustModalities-plot_factor_map}{}}}
-\subsection{Method \code{plot_factor_map()}}{
+\if{html}{\out{<a id="method-ClustModalities-plot_factorial_map"></a>}}
+\if{latex}{\out{\hypertarget{method-ClustModalities-plot_factorial_map}{}}}
+\subsection{Method \code{plot_factorial_map()}}{
+Plot factorial map of modalities (ACM method only)
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$plot_factor_map(dim1 = 1, dim2 = 2, show_labels = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$plot_factorial_map(dims = c(1, 2), k = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{dims}}{Dimensions to plot (default: c(1, 2))}
+
+\item{\code{k}}{Number of clusters to color (default: NULL = use self$k)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+NULL (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_factorial_map(dims = c(1, 2), k = 3)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -127,8 +489,33 @@ List with optimal_k, results data.frame, and plot function
 \if{html}{\out{<a id="method-ClustModalities-plot_scree"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-plot_scree}{}}}
 \subsection{Method \code{plot_scree()}}{
+Plot scree plot of eigenvalues (ACM method only)
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$plot_scree(cumulative = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{cumulative}}{Logical, whether to plot cumulative inertia (default: FALSE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Percentage of inertia (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_scree()
+cm$plot_scree(cumulative = TRUE)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -136,17 +523,110 @@ List with optimal_k, results data.frame, and plot function
 \if{html}{\out{<a id="method-ClustModalities-plot_contrib"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-plot_contrib}{}}}
 \subsection{Method \code{plot_contrib()}}{
+Plot modality contributions to a dimension (ACM method only)
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$plot_contrib(dim = 1, top = NULL)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{dim}}{Dimension number (default: 1)}
+
+\item{\code{top}}{Number of top contributors to display (default: NULL = all)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Contribution values (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+cm$plot_contrib(dim = 1, top = 10)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-ClustModalities-project_numeric"></a>}}
-\if{latex}{\out{\hypertarget{method-ClustModalities-project_numeric}{}}}
-\subsection{Method \code{project_numeric()}}{
+\if{html}{\out{<a id="method-ClustModalities-illustrative_numeric"></a>}}
+\if{latex}{\out{\hypertarget{method-ClustModalities-illustrative_numeric}{}}}
+\subsection{Method \code{illustrative_numeric()}}{
+Project quantitative illustrative variables (correlation circle)
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$project_numeric(X_quant, plot = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$illustrative_numeric(X_quant, plot = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X_quant}}{Data frame with numeric variables}
+
+\item{\code{plot}}{Logical, whether to display the plot (default: TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Data frame with correlations
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+quant_vars <- data.frame(x = rnorm(nrow(vote)), y = rnorm(nrow(vote)))
+cors <- cm$illustrative_numeric(quant_vars, plot = TRUE)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-ClustModalities-illustrative"></a>}}
+\if{latex}{\out{\hypertarget{method-ClustModalities-illustrative}{}}}
+\subsection{Method \code{illustrative()}}{
+Project qualitative illustrative variables onto clusters
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$illustrative(X_illust, plot = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X_illust}}{Data frame with categorical illustrative variables}
+
+\item{\code{plot}}{Logical, whether to display the plot (default: TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List containing:
+\itemize{
+\item \code{table} - Data frame with cluster assignments and distances
+\item \code{plot} - Function to generate the visualization
+}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+illust_vars <- data.frame(extra = factor(sample(c("A", "B"), nrow(vote), replace = TRUE)))
+illust_results <- cm$illustrative(illust_vars, plot = TRUE)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -154,17 +634,53 @@ List with optimal_k, results data.frame, and plot function
 \if{html}{\out{<a id="method-ClustModalities-cluster_table"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-cluster_table}{}}}
 \subsection{Method \code{cluster_table()}}{
+Get cluster assignments as a data frame
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$cluster_table(k = NULL)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{k}}{Number of clusters (default: NULL = use self$k)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Data frame with modalities and cluster assignments
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-predict"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-predict}{}}}
 \subsection{Method \code{predict()}}{
+Assign new categorical variables to existing clusters
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$predict(X_new)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X_new}}{Data frame with new categorical variables}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Data frame with cluster assignments and distances
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(vote)
+cm <- ClustModalities$new(method = "acm")
+cm$fit(vote, k = 3)
+new_data <- vote[1:5, ]
+predictions <- cm$predict(new_data)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -172,19 +688,61 @@ List with optimal_k, results data.frame, and plot function
 \if{html}{\out{<a id="method-ClustModalities-print"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-print}{}}}
 \subsection{Method \code{print()}}{
+Print model summary
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{ClustModalities$print(...)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Additional arguments (ignored)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Self (invisibly)
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-summary"></a>}}
 \if{latex}{\out{\hypertarget{method-ClustModalities-summary}{}}}
 \subsection{Method \code{summary()}}{
+Generate detailed clustering statistics
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$summary(...)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$summary(print_output = TRUE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{print_output}}{Logical, whether to print to console (default: TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List containing:
+\itemize{
+\item \code{basic_stats} - Basic dataset statistics
+\item \code{acm_stats} - MCA eigenvalue statistics (ACM method only)
+\item \code{cluster_stats} - Per-cluster statistics
+\item \code{cluster_composition} - Detailed cluster composition
+\item \code{method} - Clustering method used
+}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-ClustModalities-get_clusters_table"></a>}}
+\if{latex}{\out{\hypertarget{method-ClustModalities-get_clusters_table}{}}}
+\subsection{Method \code{get_clusters_table()}}{
+Get cluster assignments as a data frame
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{ClustModalities$get_clusters_table()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Data frame with modalities and cluster assignments
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-ClustModalities-clone"></a>}}

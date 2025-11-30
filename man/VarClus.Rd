@@ -2,33 +2,207 @@
 % Please edit documentation in R/varclus.R
 \name{VarClus}
 \alias{VarClus}
-\title{Variable Clustering R6 Class using VarClus}
+\title{Variable Clustering using Hierarchical Methods}
 \description{
-Variable Clustering R6 Class using VarClus
-
-Variable Clustering R6 Class using VarClus
+Implements hierarchical variable clustering using the VarClus algorithm from Hmisc.
+Variables are grouped based on their correlation structure, with each cluster
+represented by its first principal component (PC1).
 }
 \details{
-An R6 class for performing variable clustering on numeric datasets.
-Implements hierarchical clustering via \code{Hmisc::varclus}, with support for
-elbow-based number of clusters selection, dendrogram plotting, and correlation heatmaps.
+The VarClus algorithm works as follows:
+\enumerate{
+\item Calculate similarity matrix between all variables (correlation or Spearman)
+\item Perform hierarchical clustering on similarity matrix
+\item Cut dendrogram at specified number of clusters (or automatic selection)
+\item Each cluster is represented by its first principal component (PC1)
+}
+
+The algorithm iteratively splits clusters to maximize the variance explained by
+the first principal component of each cluster.
+}
+\section{Similarity Measures}{
+
+Two similarity measures are available:
+\itemize{
+\item \strong{pearson}: Pearson correlation coefficient (linear relationships)
+\item \strong{spearman}: Spearman rank correlation (monotonic relationships)
+}
+}
+
+\section{Cluster Quality}{
+
+Cluster quality is assessed by:
+\itemize{
+\item \strong{Eigenvalue}: First eigenvalue from PCA of cluster variables
+\item \strong{Proportion explained}: Variance explained by PC1
+\item \strong{R? own cluster}: Squared correlation with own cluster PC1
+\item \strong{R? next cluster}: Squared correlation with nearest other cluster PC1
+\item \strong{1-R? Ratio}: (1-R?_own)/(1-R?_next) - should be < 1 for good assignment
+}
+}
+
+\section{Illustrative Variables}{
+
+New variables can be projected onto existing clusters using:
+\itemize{
+\item \code{predict()}: Assigns a single variable to the best cluster
+\item \code{illustrative()}: Full analysis of multiple illustrative variables with regression and PCA visualization
+}
+}
+
+\examples{
+\dontrun{
+# Example with numeric data
+data(mtcars)
+X_num <- mtcars[, c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec")]
+
+# Automatic k selection
+vc <- VarClus$new(similarity = "pearson")
+vc$fit(X_num)
+
+# Display results
+vc$print()
+vc$summary()
+
+# Visualizations
+dend_plot <- vc$get_dendrogram()
+dend_plot()
+
+heatmap_plot <- vc$get_heatmap()
+heatmap_plot()
+
+# Manual k selection
+vc_k3 <- VarClus$new(similarity = "pearson", n_clusters = 3)
+vc_k3$fit(X_num)
+
+# Get cluster assignments
+clusters_df <- vc_k3$get_clusters_table()
+
+# Predict new variable
+new_var <- mtcars$vs
+prediction <- vc_k3$predict(new_var)
+
+# Illustrative variables (full analysis)
+illust_vars <- mtcars[, c("vs", "am", "gear")]
+illust_results <- vc_k3$illustrative(illust_vars)
+print(illust_results$table)
+illust_results$plot()
+}
+
+
+## ------------------------------------------------
+## Method `VarClus$fit`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+}
+
+## ------------------------------------------------
+## Method `VarClus$get_dendrogram`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+dend_plot <- vc$get_dendrogram()
+dend_plot()
+}
+
+## ------------------------------------------------
+## Method `VarClus$get_heatmap`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+heatmap_plot <- vc$get_heatmap()
+heatmap_plot()
+}
+
+## ------------------------------------------------
+## Method `VarClus$predict`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+prediction <- vc$predict(new_variable)
+}
+
+## ------------------------------------------------
+## Method `VarClus$illustrative`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+illust_results <- vc$illustrative(illustrative_vars)
+print(illust_results$table)
+illust_results$plot()
+}
+
+## ------------------------------------------------
+## Method `VarClus$print`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+vc$print()
+}
+
+## ------------------------------------------------
+## Method `VarClus$summary`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+summary_data <- vc$summary(print_output = FALSE)
+}
+
+## ------------------------------------------------
+## Method `VarClus$get_clusters_table`
+## ------------------------------------------------
+
+\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+clusters_df <- vc$get_clusters_table()
+}
+}
+\references{
+\itemize{
+\item Sarle, W. S. (1990). The VARCLUS Procedure. SAS/STAT User's Guide.
+\item Harrell, F. E. (2001). Regression Modeling Strategies. Springer.
+}
 }
 \section{Public fields}{
 \if{html}{\out{<div class="r6-fields">}}
 \describe{
-\item{\code{similarity}}{Similarity measure used in clustering (default "pearson")}
+\item{\code{similarity}}{Similarity measure: "pearson" or "spearman"}
 
-\item{\code{n_clusters}}{Number of clusters to cut the dendrogram (auto if NULL)}
+\item{\code{n_clusters}}{Number of clusters (NULL for automatic selection)}
 
-\item{\code{model}}{The fitted VarClus model object}
+\item{\code{model}}{Fitted VarClus model object from Hmisc::varclus()}
 
-\item{\code{clusters}}{Data frame of variable names and their cluster assignments}
+\item{\code{clusters}}{Data frame with variable names and cluster assignments}
 
-\item{\code{data}}{The numeric dataset used for clustering}
+\item{\code{data}}{Numeric dataset used for clustering}
 
 \item{\code{dendo}}{Internal dendrogram object}
 
-\item{\code{plot_elbow}}{Plot object from the elbow method}
+\item{\code{plot_elbow}}{Plot object from elbow method}
 }
 \if{html}{\out{</div>}}
 }
@@ -43,6 +217,7 @@ elbow-based number of clusters selection, dendrogram plotting, and correlation h
 \item \href{#method-VarClus-illustrative}{\code{VarClus$illustrative()}}
 \item \href{#method-VarClus-print}{\code{VarClus$print()}}
 \item \href{#method-VarClus-summary}{\code{VarClus$summary()}}
+\item \href{#method-VarClus-get_clusters_table}{\code{VarClus$get_clusters_table()}}
 \item \href{#method-VarClus-clone}{\code{VarClus$clone()}}
 }
 }
@@ -50,7 +225,7 @@ elbow-based number of clusters selection, dendrogram plotting, and correlation h
 \if{html}{\out{<a id="method-VarClus-new"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-new}{}}}
 \subsection{Method \code{new()}}{
-Initialize a new VarClus object
+Create a new VarClus object
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{VarClus$new(similarity = "pearson", n_clusters = NULL)}\if{html}{\out{</div>}}
 }
@@ -58,18 +233,21 @@ Initialize a new VarClus object
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{similarity}}{Character string. Similarity measure used for clustering (default "pearson").}
+\item{\code{similarity}}{Similarity measure: "pearson" or "spearman" (default: "pearson")}
 
-\item{\code{n_clusters}}{Integer. Optional number of clusters; if NULL, it will be determined automatically.}
+\item{\code{n_clusters}}{Number of clusters (NULL for automatic selection)}
 }
 \if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A new \code{VarClus} object
 }
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-VarClus-fit"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-fit}{}}}
 \subsection{Method \code{fit()}}{
-Fit the clustering model
+Fit the variable clustering model
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{VarClus$fit(X_num)}\if{html}{\out{</div>}}
 }
@@ -77,43 +255,115 @@ Fit the clustering model
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{X_num}}{A numeric data frame or matrix}
+\item{\code{X_num}}{Numeric data frame or matrix}
 }
 \if{html}{\out{</div>}}
 }
+\subsection{Returns}{
+Self (invisibly) for method chaining
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-VarClus-get_dendrogram"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-get_dendrogram}{}}}
 \subsection{Method \code{get_dendrogram()}}{
-plots the dendrogram of clustered variables
+Generate dendrogram plot of clustered variables
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{VarClus$get_dendrogram()}\if{html}{\out{</div>}}
 }
 
 \subsection{Returns}{
-A function that plots the dendrogram
+Function that generates the dendrogram plot
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+dend_plot <- vc$get_dendrogram()
+dend_plot()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-VarClus-get_heatmap"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-get_heatmap}{}}}
 \subsection{Method \code{get_heatmap()}}{
-plots the correlation heatmap of the variables
+Generate correlation heatmap of variables
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{VarClus$get_heatmap()}\if{html}{\out{</div>}}
 }
 
 \subsection{Returns}{
-A function that plots the heatmap
+Function that generates the interactive heatmap (plotly)
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+heatmap_plot <- vc$get_heatmap()
+heatmap_plot()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-VarClus-predict"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-predict}{}}}
 \subsection{Method \code{predict()}}{
+Predict cluster assignment for a single new variable
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{VarClus$predict(new_var)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{new_var}}{Numeric vector (same length as training data)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List containing:
+\itemize{
+\item \code{predicted_cluster} - Assigned cluster number
+\item \code{cluster_similarity} - Average correlation with each cluster
+\item \code{var_corr} - Correlations with variables in assigned cluster
+}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+prediction <- vc$predict(new_variable)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -121,8 +371,38 @@ A function that plots the heatmap
 \if{html}{\out{<a id="method-VarClus-illustrative"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-illustrative}{}}}
 \subsection{Method \code{illustrative()}}{
+Project illustrative variables onto clusters with full analysis
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{VarClus$illustrative(illust_vars)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{illust_vars}}{Data frame of numeric illustrative variables}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List containing:
+\itemize{
+\item \code{table} - Regression results (R, R?, t-values, p-values)
+\item \code{plot} - Function to generate PCA correlation circle
+}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+illust_results <- vc$illustrative(illustrative_vars)
+print(illust_results$table)
+illust_results$plot()
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -130,38 +410,93 @@ A function that plots the heatmap
 \if{html}{\out{<a id="method-VarClus-print"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-print}{}}}
 \subsection{Method \code{print()}}{
-Print a concise summary of the VarClus model
+Print concise summary of the VarClus model
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{VarClus$print()}\if{html}{\out{</div>}}
 }
 
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{...}}{Additional arguments (ignored)}
+\subsection{Returns}{
+Self (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+vc$print()
+}
 }
 \if{html}{\out{</div>}}
+
 }
-\subsection{Returns}{
-Prints a concise summary of the clustering model
-}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-VarClus-summary"></a>}}
 \if{latex}{\out{\hypertarget{method-VarClus-summary}{}}}
 \subsection{Method \code{summary()}}{
-Return a detailed summary of the VarClus model results
+Generate detailed clustering statistics
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{VarClus$summary()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{VarClus$summary(print_output = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{print_output}}{Logical, whether to print to console (default: TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List containing:
+\itemize{
+\item \code{global_stats} - Basic statistics
+\item \code{cluster_summary} - Per-cluster PCA statistics
+\item \code{cluster_quality} - Average R? per cluster
+\item \code{R2_details} - Detailed R? for each variable
+\item \code{similarity_matrix} - Similarity matrix between variables
+}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+summary_data <- vc$summary(print_output = FALSE)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-VarClus-get_clusters_table"></a>}}
+\if{latex}{\out{\hypertarget{method-VarClus-get_clusters_table}{}}}
+\subsection{Method \code{get_clusters_table()}}{
+Get cluster assignments as a data frame
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{VarClus$get_clusters_table()}\if{html}{\out{</div>}}
 }
 
 \subsection{Returns}{
-A list with:
-\describe{
-\item{text}{Text summary of the clustering model}
-\item{cluster_summary}{Cluster summary (number of variables, eigenvalues, variance explained)}
-\item{R2_summary}{R² summary for each variable}
+Data frame with variables and cluster assignments
 }
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+data(crime)
+vc <- VarClus$new()
+vc$fit(crime)
+clusters_df <- vc$get_clusters_table()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-VarClus-clone"></a>}}

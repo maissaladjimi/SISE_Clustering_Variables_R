@@ -20,11 +20,16 @@ RoxygenNote: 7.3.3
 Imports:
     R6,
     Hmisc,
+    ade4,
     dendextend,
-    FactoMineR
-Suggests:
+    plotly,
     shiny,
+    stats,
+    graphics
+Suggests:
     shinyjs,
     shinythemes,
-    plotly,
     testthat
+Depends: 
+    R (>= 3.5)
+LazyData: true

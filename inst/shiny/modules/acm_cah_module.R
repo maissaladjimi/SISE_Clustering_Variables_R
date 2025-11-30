@@ -1,7 +1,7 @@
 # ==============================================================================
 # ACM-CAH MODULE - UI & SERVER
-# Module Shiny pour ACM-CAH avec illustrative
-# Compatible avec clustering_engine
+# Shiny Module pour ACM-CAH avec illustrative
+# Compatible with clustering_engine
 # ==============================================================================
 
 library(shiny)

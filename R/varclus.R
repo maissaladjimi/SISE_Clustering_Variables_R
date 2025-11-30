@@ -1,59 +1,149 @@
-#' Variable Clustering R6 Class using VarClus
+#' Variable Clustering using Hierarchical Methods
 #'
-#' VERSION AMÉLIORÉE - AJOUTS:
-#' 1. ✅ illustrative() déjà présent
-#' 2. ✅ predict() déjà présent
-#' 3. ✅ summary() amélioré avec affichage formaté
-#' 4. ✅ print() amélioré avec plus d'informations
+#' @description
+#' Implements hierarchical variable clustering using the VarClus algorithm from Hmisc.
+#' Variables are grouped based on their correlation structure, with each cluster
+#' represented by its first principal component (PC1).
+#'
+#' @details
+#' The VarClus algorithm works as follows:
+#' \enumerate{
+#'   \item Calculate similarity matrix between all variables (correlation or Spearman)
+#'   \item Perform hierarchical clustering on similarity matrix
+#'   \item Cut dendrogram at specified number of clusters (or automatic selection)
+#'   \item Each cluster is represented by its first principal component (PC1)
+#' }
+#'
+#' The algorithm iteratively splits clusters to maximize the variance explained by
+#' the first principal component of each cluster.
+#'
+#' @section Similarity Measures:
+#' Two similarity measures are available:
+#' \itemize{
+#'   \item **pearson**: Pearson correlation coefficient (linear relationships)
+#'   \item **spearman**: Spearman rank correlation (monotonic relationships)
+#' }
+#'
+#' @section Cluster Quality:
+#' Cluster quality is assessed by:
+#' \itemize{
+#'   \item **Eigenvalue**: First eigenvalue from PCA of cluster variables
+#'   \item **Proportion explained**: Variance explained by PC1
+#'   \item **R? own cluster**: Squared correlation with own cluster PC1
+#'   \item **R? next cluster**: Squared correlation with nearest other cluster PC1
+#'   \item **1-R? Ratio**: (1-R?_own)/(1-R?_next) - should be < 1 for good assignment
+#' }
+#'
+#' @section Illustrative Variables:
+#' New variables can be projected onto existing clusters using:
+#' \itemize{
+#'   \item \code{predict()}: Assigns a single variable to the best cluster
+#'   \item \code{illustrative()}: Full analysis of multiple illustrative variables with regression and PCA visualization
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' # Example with numeric data
+#' data(mtcars)
+#' X_num <- mtcars[, c("mpg", "cyl", "disp", "hp", "drat", "wt", "qsec")]
+#'
+#' # Automatic k selection
+#' vc <- VarClus$new(similarity = "pearson")
+#' vc$fit(X_num)
+#'
+#' # Display results
+#' vc$print()
+#' vc$summary()
+#'
+#' # Visualizations
+#' dend_plot <- vc$get_dendrogram()
+#' dend_plot()
+#'
+#' heatmap_plot <- vc$get_heatmap()
+#' heatmap_plot()
+#'
+#' # Manual k selection
+#' vc_k3 <- VarClus$new(similarity = "pearson", n_clusters = 3)
+#' vc_k3$fit(X_num)
+#'
+#' # Get cluster assignments
+#' clusters_df <- vc_k3$get_clusters_table()
+#'
+#' # Predict new variable
+#' new_var <- mtcars$vs
+#' prediction <- vc_k3$predict(new_var)
+#'
+#' # Illustrative variables (full analysis)
+#' illust_vars <- mtcars[, c("vs", "am", "gear")]
+#' illust_results <- vc_k3$illustrative(illust_vars)
+#' print(illust_results$table)
+#' illust_results$plot()
+#' }
+#'
+#' @references
+#' \itemize{
+#'   \item Sarle, W. S. (1990). The VARCLUS Procedure. SAS/STAT User's Guide.
+#'   \item Harrell, F. E. (2001). Regression Modeling Strategies. Springer.
+#' }
+#'
+#' @field similarity Similarity measure: "pearson" or "spearman"
+#' @field n_clusters Number of clusters (NULL for automatic selection)
+#' @field model Fitted VarClus model object from Hmisc::varclus()
+#' @field clusters Data frame with variable names and cluster assignments
+#' @field data Numeric dataset used for clustering
+#' @field dendo Internal dendrogram object
+#' @field plot_elbow Plot object from elbow method
 #'
 #' @import R6
 #' @import Hmisc
-#' @import dendextend
-#' @import plotly
+#' @importFrom dendextend color_branches
+#' @importFrom plotly plot_ly layout
+#' @importFrom stats prcomp cor cutree as.dendrogram lm
+#' @importFrom graphics plot abline arrows text points
 #' @export
 VarClus <- R6::R6Class(
   "VarClus",
 
-
   public = list(
 
-    # --------------------
-    # Fields
-    # --------------------
-    #' @field similarity Similarity measure used in clustering (default "pearson")
+    # ==========================================================================
+    # PUBLIC FIELDS
+    # ==========================================================================
+
     similarity = NULL,
-    #' @field n_clusters Number of clusters to cut the dendrogram (auto if NULL)
     n_clusters = NULL,
-    #' @field model The fitted VarClus model object
     model = NULL,
-    #' @field clusters Data frame of variable names and their cluster assignments
     clusters = NULL,
-    #' @field data The numeric dataset used for clustering
     data = NULL,
-    #' @field dendo Internal dendrogram object
     dendo = NULL,
-    #' @field plot_elbow Plot object from the elbow method
     plot_elbow = NULL,
 
+    # ==========================================================================
+    # CONSTRUCTOR
+    # ==========================================================================
 
-    # --------------------
-    # Constructor
-    # --------------------
-    #' @description Initialize a new VarClus object
-    #' @param similarity Character string. Similarity measure used for clustering (default "pearson").
-    #' @param n_clusters Integer. Optional number of clusters; if NULL, it will be determined automatically.
+    #' @description Create a new VarClus object
+    #' @param similarity Similarity measure: "pearson" or "spearman" (default: "pearson")
+    #' @param n_clusters Number of clusters (NULL for automatic selection)
+    #' @return A new `VarClus` object
     initialize = function(similarity = "pearson", n_clusters = NULL) {
       self$similarity <- similarity
       self$n_clusters <- n_clusters
     },
 
+    # ==========================================================================
+    # FIT - Main clustering method
+    # ==========================================================================
 
-
-    # --------------------
-    # Fit Method
-    # --------------------
-    #' @description Fit the clustering model
-    #' @param X_num A numeric data frame or matrix
+    #' @description Fit the variable clustering model
+    #' @param X_num Numeric data frame or matrix
+    #' @return Self (invisibly) for method chaining
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' }
     fit = function(X_num) {
 
       self$data <- X_num
@@ -63,13 +153,13 @@ VarClus <- R6::R6Class(
         stop("Input X must be fully numeric")
       }
 
-      if (ncol(X_num) < 2) stop("At least two numeric variables are required.")
+      if (ncol(X_num) < 2) stop("At least two numeric variables are required")
 
       # Run VarClus
       self$model <- Hmisc::varclus(x = X_num, similarity = self$similarity)
 
       # Run elbow method
-      if (!exists("varclus_elbow")) stop("Function varclus_elbow() not found.")
+      if (!exists("varclus_elbow")) stop("Function varclus_elbow() not found")
       res <- varclus_elbow(X_num, similarity = self$similarity)
       self$plot_elbow <- res$plot
 
@@ -89,16 +179,24 @@ VarClus <- R6::R6Class(
       invisible(self)
     },
 
+    # ==========================================================================
+    # GET_DENDROGRAM - Visualization
+    # ==========================================================================
 
-
-    # --------------------
-    # Get dendrogram
-    # --------------------
-    #' @description plots the dendrogram of clustered variables
-    #' @return A function that plots the dendrogram
+    #' @description Generate dendrogram plot of clustered variables
+    #' @return Function that generates the dendrogram plot
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' dend_plot <- vc$get_dendrogram()
+    #' dend_plot()
+    #' }
     get_dendrogram = function() {
 
-      if (is.null(self$model) || is.null(self$clusters)) stop("Model not yet fitted or clusters not computed.")
+      if (is.null(self$model) || is.null(self$clusters))
+        stop("Model not yet fitted or clusters not computed")
 
       hc <- self$model$hclust
       dend <- as.dendrogram(hc)
@@ -107,22 +205,28 @@ VarClus <- R6::R6Class(
 
       dend <- dendextend::color_branches(dend, k = k, col = cols)
 
-
       function() {
         plot(dend, horiz = FALSE, main = NULL, xlab = NULL)
       }
     },
 
+    # ==========================================================================
+    # GET_HEATMAP - Correlation heatmap
+    # ==========================================================================
 
-
-    # --------------------
-    # Get heatmap
-    # --------------------
-    #' @description plots the correlation heatmap of the variables
-    #' @return A function that plots the heatmap
+    #' @description Generate correlation heatmap of variables
+    #' @return Function that generates the interactive heatmap (plotly)
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' heatmap_plot <- vc$get_heatmap()
+    #' heatmap_plot()
+    #' }
     get_heatmap = function() {
 
-      if (is.null(self$model)) stop("Model not yet fitted.")
+      if (is.null(self$model)) stop("Model not yet fitted")
 
       cor_mat <- self$model$sim
 
@@ -143,19 +247,32 @@ VarClus <- R6::R6Class(
       }
     },
 
-    #-------------
-    # Predict Method
-    #-------------
+    # ==========================================================================
+    # PREDICT - Assign single variable to cluster
+    # ==========================================================================
 
+    #' @description Predict cluster assignment for a single new variable
+    #' @param new_var Numeric vector (same length as training data)
+    #' @return List containing:
+    #' * `predicted_cluster` - Assigned cluster number
+    #' * `cluster_similarity` - Average correlation with each cluster
+    #' * `var_corr` - Correlations with variables in assigned cluster
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' prediction <- vc$predict(new_variable)
+    #' }
     predict = function(new_var) {
 
       if (is.null(self$model) || is.null(self$clusters)) {
-        stop("Model must be fitted before predicting.")
+        stop("Model must be fitted before predicting")
       }
 
-      if (!is.numeric(new_var)) stop("new_var must be numeric.")
+      if (!is.numeric(new_var)) stop("new_var must be numeric")
       if (length(new_var) != nrow(self$data)) {
-        stop("new_var must have the same number of rows as the training data.")
+        stop("new_var must have the same number of rows as the training data")
       }
 
       if (!all(length(new_var) == nrow(self$data))) {
@@ -193,15 +310,30 @@ VarClus <- R6::R6Class(
       return(result)
     },
 
-    #-------------
-    # illustrative Method
-    #-------------
+    # ==========================================================================
+    # ILLUSTRATIVE - Full analysis of illustrative variables
+    # ==========================================================================
 
+    #' @description Project illustrative variables onto clusters with full analysis
+    #' @param illust_vars Data frame of numeric illustrative variables
+    #' @return List containing:
+    #' * `table` - Regression results (R, R?, t-values, p-values)
+    #' * `plot` - Function to generate PCA correlation circle
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' illust_results <- vc$illustrative(illustrative_vars)
+    #' print(illust_results$table)
+    #' illust_results$plot()
+    #' }
     illustrative = function(illust_vars) {
-      if (is.null(self$model)) stop("Model not yet fitted.")
+      if (is.null(self$model)) stop("Model not yet fitted")
       illust_vars <- as.data.frame(illust_vars)
       cluster_pcs <- private$compute_cluster_pcs_list()
 
+      # Regression analysis for each illustrative variable
       results_list <- lapply(colnames(illust_vars), function(yname) {
         y <- illust_vars[[yname]]
         df <- data.frame(Y = y)
@@ -225,10 +357,7 @@ VarClus <- R6::R6Class(
 
       res_table <- do.call(rbind, results_list)
 
-      # -----------------------------
       # PCA correlation circle plot
-      # -----------------------------
-
       pca_plot <- function() {
         active_data <- scale(self$data)
         pca_active <- prcomp(active_data, center = TRUE, scale. = TRUE)
@@ -244,74 +373,96 @@ VarClus <- R6::R6Class(
         abline(h = 0, v = 0, lty = 2, col = "black")
 
         # Active variable arrows in blue
-        arrows(0, 0, loadings[,1]*arrows_scaling, loadings[,2]*arrows_scaling, col = "blue", length = 0.1)
-        text(loadings[,1]*arrows_scaling*1.1, loadings[,2]*arrows_scaling*1.1, labels = rownames(loadings), col = "blue")
+        arrows(0, 0, loadings[, 1]*arrows_scaling, loadings[, 2]*arrows_scaling,
+               col = "blue", length = 0.1)
+        text(loadings[, 1]*arrows_scaling*1.1, loadings[, 2]*arrows_scaling*1.1,
+             labels = rownames(loadings), col = "blue")
 
-        # Illustrative variables arrows in red
+        # Illustrative variable arrows in red
         illust_scaled <- scale(illust_vars)
-        cor_illu <- cor(illust_scaled, pca_active$x[,1:2])
-        arrows(0, 0, cor_illu[,1]*arrows_scaling, cor_illu[,2]*arrows_scaling, col = "red", length = 0.1)
-        text(cor_illu[,1]*arrows_scaling*1.1, cor_illu[,2]*arrows_scaling*1.1, labels = rownames(cor_illu), col = "red", font = 2)
+        cor_illu <- cor(illust_scaled, pca_active$x[, 1:2])
+        arrows(0, 0, cor_illu[, 1]*arrows_scaling, cor_illu[, 2]*arrows_scaling,
+               col = "red", length = 0.1)
+        text(cor_illu[, 1]*arrows_scaling*1.1, cor_illu[, 2]*arrows_scaling*1.1,
+             labels = rownames(cor_illu), col = "red", font = 2)
       }
 
       return(list(table = res_table, plot = pca_plot))
     },
 
+    # ==========================================================================
+    # PRINT - Display summary
+    # ==========================================================================
 
-    # --------------------
-    # Print method - AMÉLIORÉ
-    # --------------------
-    #' @description Print a concise summary of the VarClus model
-    #' @param ... Additional arguments (ignored)
-    #' @return Prints a concise summary of the clustering model
+    #' @description Print concise summary of the VarClus model
+    #' @return Self (invisibly)
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' vc$print()
+    #' }
     print = function() {
       cat("========================================\n")
-      cat("  VARCLUS - CLUSTERING DE VARIABLES\n")
+      cat("  VARCLUS - VARIABLE CLUSTERING\n")
       cat("========================================\n")
-      cat(sprintf("Similarité: %s\n", self$similarity))
+      cat(sprintf("Similarity: %s\n", self$similarity))
 
       if (!is.null(self$model)) {
-        cat(sprintf("\nStatut: Modèle ajusté\n"))
-        cat(sprintf("\nDonnées:\n"))
-        cat(sprintf("  - Nombre de variables       : %d\n", length(self$model$hclust$order)))
-        cat(sprintf("  - Nombre de clusters        : %d\n", self$n_clusters))
+        cat(sprintf("\nStatus: Model fitted\n"))
+        cat(sprintf("\nData:\n"))
+        cat(sprintf("  - Number of variables       : %d\n", length(self$model$hclust$order)))
+        cat(sprintf("  - Number of clusters        : %d\n", self$n_clusters))
 
         if (!is.null(self$clusters)) {
           tbl <- table(self$clusters$cluster)
-          cat(sprintf("\nTaille des clusters:\n"))
+          cat(sprintf("\nCluster sizes:\n"))
           for (i in 1:length(tbl)) {
             cat(sprintf("  - Cluster %d                 : %d variables\n", i, tbl[i]))
           }
         }
       } else {
-        cat("\nStatut: Modèle non ajusté. Utilisez fit() pour entraîner.\n")
+        cat("\nStatus: Model not fitted. Use fit() to train.\n")
       }
 
       cat("========================================\n")
       invisible(self)
     },
 
+    # ==========================================================================
+    # SUMMARY - Detailed statistics
+    # ==========================================================================
 
-
-    # --------------------
-    # Summary method - AMÉLIORÉ
-    # --------------------
-    #' @description Return a detailed summary of the VarClus model results
-    #' @return A list with detailed clustering information
+    #' @description Generate detailed clustering statistics
+    #' @param print_output Logical, whether to print to console (default: TRUE)
+    #' @return List containing:
+    #' * `global_stats` - Basic statistics
+    #' * `cluster_summary` - Per-cluster PCA statistics
+    #' * `cluster_quality` - Average R? per cluster
+    #' * `R2_details` - Detailed R? for each variable
+    #' * `similarity_matrix` - Similarity matrix between variables
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' summary_data <- vc$summary(print_output = FALSE)
+    #' }
     summary = function(print_output = TRUE) {
-      if (is.null(self$model)) stop("Model not yet fitted.")
+      if (is.null(self$model)) stop("Model not yet fitted")
 
       cluster_pcs <- private$compute_cluster_pcs()
       cluster_r2 <- private$compute_cluster_R2()
 
-      # Statistiques globales
+      # Global statistics
       global_stats <- data.frame(
-        metric = c("Nombre de variables", "Nombre de clusters", "Mesure de similarité"),
+        metric = c("Number of variables", "Number of clusters", "Similarity measure"),
         value = c(ncol(self$data), self$n_clusters, self$similarity),
         stringsAsFactors = FALSE
       )
 
-      # Qualité moyenne par cluster
+      # Average quality per cluster
       mean_r2_by_cluster <- tapply(
         as.numeric(cluster_r2$Own_Cluster),
         cluster_r2$Cluster,
@@ -328,25 +479,25 @@ VarClus <- R6::R6Class(
         self$print()
 
         cat("\n========================================\n")
-        cat("  STATISTIQUES GLOBALES\n")
+        cat("  GLOBAL STATISTICS\n")
         cat("========================================\n")
         print(global_stats, row.names = FALSE)
 
         cat("\n========================================\n")
-        cat("  RÉSUMÉ PAR CLUSTER\n")
+        cat("  CLUSTER SUMMARY\n")
         cat("========================================\n")
-        cat("Note: Variance expliquée = eigenvalue / n_variables\n\n")
+        cat("Note: Variance explained = eigenvalue / n_variables\n\n")
         print(cluster_pcs, row.names = FALSE)
 
         cat("\n========================================\n")
-        cat("  QUALITÉ MOYENNE PAR CLUSTER\n")
+        cat("  AVERAGE QUALITY PER CLUSTER\n")
         cat("========================================\n")
         print(cluster_quality, row.names = FALSE)
 
         cat("\n========================================\n")
-        cat("  DÉTAILS R² PAR VARIABLE (top 30)\n")
+        cat("  R? DETAILS BY VARIABLE (top 30)\n")
         cat("========================================\n")
-        cat("Note: 1-R² ratio doit être < 1 pour bonne assignation\n\n")
+        cat("Note: 1-R? ratio should be < 1 for good assignment\n\n")
         print(head(cluster_r2, 30), row.names = FALSE)
       }
 
@@ -359,6 +510,19 @@ VarClus <- R6::R6Class(
       ))
     },
 
+    # ==========================================================================
+    # GET_CLUSTERS_TABLE
+    # ==========================================================================
+
+    #' @description Get cluster assignments as a data frame
+    #' @return Data frame with variables and cluster assignments
+    #' @examples
+    #' \dontrun{
+    #' data(crime)
+    #' vc <- VarClus$new()
+    #' vc$fit(crime)
+    #' clusters_df <- vc$get_clusters_table()
+    #' }
     get_clusters_table = function() {
       if (is.null(self$clusters)) {
         stop("Model not yet fitted. Run fit() first.")
@@ -367,13 +531,18 @@ VarClus <- R6::R6Class(
     }
   ),
 
-
+  # ============================================================================
+  # PRIVATE METHODS
+  # ============================================================================
 
   private = list(
 
-    # --------------------
-    # Compute PC1 list for each cluster
-    # --------------------
+    # Compute PC1 for each cluster
+    #
+    # Calculates the first principal component of variables in each cluster.
+    # For single-variable clusters, returns the standardized variable itself.
+    #
+    # @return List of PC1 vectors (one per cluster)
     compute_cluster_pcs_list = function() {
 
       clusters <- self$clusters
@@ -383,8 +552,10 @@ VarClus <- R6::R6Class(
         vars <- clusters$variable[clusters$cluster == k]
 
         if (length(vars) == 1) {
+          # Single variable: use standardized variable as PC1
           cluster_pcs[[as.character(k)]] <- scale(self$data[, vars])
         } else {
+          # Multiple variables: compute PC1 via PCA
           mat <- scale(self$data[, vars, drop = FALSE])
           pca <- prcomp(mat, center = TRUE, scale. = TRUE)
           cluster_pcs[[as.character(k)]] <- pca$x[, 1]
@@ -394,11 +565,14 @@ VarClus <- R6::R6Class(
       return(cluster_pcs)
     },
 
-
-
-    # --------------------
     # Compute cluster PCA summary
-    # --------------------
+    #
+    # Calculates PCA statistics for each cluster:
+    # - Number of variables
+    # - First eigenvalue
+    # - Proportion of variance explained by PC1
+    #
+    # @return Data frame with cluster PCA statistics
     compute_cluster_pcs = function() {
 
       cluster_pcs <- private$compute_cluster_pcs_list()
@@ -439,11 +613,15 @@ VarClus <- R6::R6Class(
       return(cluster_results)
     },
 
-
-
-    # --------------------
-    # Compute R² summary
-    # --------------------
+    # Compute R? summary for cluster quality assessment
+    #
+    # For each variable, calculates:
+    # - R? with own cluster PC1
+    # - R? with nearest other cluster PC1
+    # - 1-R? ratio: (1-R?_own)/(1-R?_next)
+    #   (should be < 1 for good assignment)
+    #
+    # @return Data frame with R? details
     compute_cluster_R2 = function() {
 
       clusters <- self$clusters
@@ -464,13 +642,16 @@ VarClus <- R6::R6Class(
         var <- clusters$variable[i]
         clust <- clusters$cluster[i]
 
+        # R? with own cluster
         R2_own <- cor(self$data[, var], cluster_pcs[[as.character(clust)]])^2
 
+        # R? with nearest other cluster
         other_clusters <- setdiff(names(cluster_pcs), as.character(clust))
         R2_next <- if (length(other_clusters) > 0) {
           max(sapply(other_clusters, function(k) cor(self$data[, var], cluster_pcs[[k]])^2))
         } else 0
 
+        # Calculate 1-R? ratio (quality metric)
         R2_all <- sapply(cluster_pcs, function(pc) cor(self$data[, var], pc)^2)
         R2_ratio <- if (length(R2_all) == 1) 0 else (1 - R2_own) / (1 - R2_next)
 
@@ -488,6 +669,5 @@ VarClus <- R6::R6Class(
 
       return(cluster_details)
     }
-
   )
 )

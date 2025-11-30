@@ -2,18 +2,46 @@
 % Please edit documentation in R/n_clusters.R
 \name{varclus_elbow}
 \alias{varclus_elbow}
-\title{Determine optimal number of clusters K using elbow method (VarClus)}
+\title{Determine Optimal Number of Clusters for VarClus}
 \usage{
 varclus_elbow(X_num, similarity = "spearman")
 }
 \arguments{
-\item{X_num}{Numeric data matrix}
+\item{X_num}{Numeric data matrix or data.frame (observations x variables)}
 
-\item{similarity}{Similarity measure ("spearman" or "pearson")}
+\item{similarity}{Similarity measure: "pearson" or "spearman" (default: "spearman")}
 }
 \value{
-List with optimal_k and plot function
+List containing:
+\item{optimal_k}{Recommended number of clusters}
+\item{plot}{Function to generate the elbow plot}
+\item{k_vals}{Vector of tested k values}
+\item{inertia}{Vector of average intra-cluster similarities}
 }
 \description{
-Determine optimal number of clusters K using elbow method (VarClus)
+Automatically selects the optimal number of clusters for hierarchical
+variable clustering using the elbow method. The algorithm tests all
+possible k values from 2 to (p-1) and maximizes average intra-cluster
+similarity (squared correlation).
+}
+\details{
+For each k, the algorithm:
+\enumerate{
+\item Cuts the VarClus dendrogram at k clusters
+\item Calculates average squared correlation within each cluster
+\item Computes mean of these averages across all clusters
+}
+
+The optimal k maximizes the perpendicular distance to the line connecting
+the first and last points of the inertia curve.
+}
+\examples{
+\dontrun{
+# Automatic k selection for VarClus
+data <- matrix(rnorm(100 * 10), ncol = 10)
+result <- varclus_elbow(data, similarity = "pearson")
+print(result$optimal_k)
+result$plot()
+}
+
 }

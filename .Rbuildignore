@@ -1,2 +1,6 @@
-^ClusteringVariables\.Rproj$
+^.*\.Rproj$
 ^\.Rproj\.user$
+^data-raw$
+^README\.Rmd$
+^\.github$
+^\.git$

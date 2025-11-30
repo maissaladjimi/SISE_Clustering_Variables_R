@@ -1,7 +1,7 @@
 # ==============================================================================
 # KMEANS MODULE - UI & SERVER
-# Module Shiny pour K-means avec illustrative
-# Compatible avec clustering_engine
+# Shiny Module pour K-means avec illustrative
+# Compatible with clustering_engine
 # ==============================================================================
 
 library(shiny)

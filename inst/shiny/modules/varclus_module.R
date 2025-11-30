@@ -1,7 +1,7 @@
 # ==============================================================================
 # VARCLUS MODULE - UI & SERVER
-# Module Shiny pour VarClus avec illustrative
-# Compatible avec clustering_engine
+# Shiny Module pour VarClus avec illustrative
+# Compatible with clustering_engine
 # ==============================================================================
 
 library(shiny)

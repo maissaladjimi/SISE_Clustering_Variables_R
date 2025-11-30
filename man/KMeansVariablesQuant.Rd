@@ -2,11 +2,230 @@
 % Please edit documentation in R/kmeans.R
 \name{KMeansVariablesQuant}
 \alias{KMeansVariablesQuant}
-\title{Elbow method to determine optimal number of clusters}
+\title{K-means Variable Clustering}
 \description{
-Elbow method to determine optimal number of clusters
+Implements a K-means algorithm adapted for clustering variables (not observations).
+Variables are grouped by maximizing their correlation with cluster centroids,
+which are computed as the first principal component (PC1) of each cluster.
+}
+\details{
+The algorithm works as follows:
+\enumerate{
+\item \strong{Initialization}: Randomly assign variables to K clusters
+\item \strong{Centroid Calculation}: For each cluster, compute PC1 via PCA as the cluster centroid
+\item \strong{Distance Calculation}: Compute R? between each variable and each centroid
+\item \strong{Reallocation}: Reassign each variable to the cluster with maximum R?
+\item \strong{Convergence Check}: Repeat steps 2-4 until convergence or max iterations reached
+}
+}
+\section{Distance Metric}{
 
-Elbow method to determine optimal number of clusters
+The algorithm uses R?-based distance:
+\deqn{d(X_j, c_k) = \sqrt{1 - R^2(X_j, c_k)}}
+where \eqn{R^2(X_j, c_k)} is the squared correlation between variable \eqn{X_j}
+and centroid \eqn{c_k}.
+}
+
+\section{Objective Function}{
+
+The algorithm maximizes total inertia, defined as:
+\deqn{I = \sum_{k=1}^K \lambda_k = \sum_{k=1}^K \sum_{X_j \in C_k} R^2(X_j, c_k)}
+where \eqn{\lambda_k} is the first eigenvalue from PCA of cluster \eqn{k}.
+}
+
+\section{Convergence}{
+
+The algorithm stops when:
+\itemize{
+\item No variable changes cluster between iterations
+\item Change in total inertia < \code{tol}
+\item Maximum iterations (\code{max_iter}) reached
+}
+}
+
+\section{Multiple Initializations}{
+
+To avoid local maxima, the algorithm runs \code{n_init} times with different
+random initializations. The solution with highest inertia is retained.
+}
+
+\examples{
+\dontrun{
+# Example with synthetic data
+set.seed(123)
+n <- 200
+
+# Create 3 groups of correlated variables
+X1 <- MASS::mvrnorm(n, rep(0, 5), diag(0.7, 5) + 0.3)
+X2 <- MASS::mvrnorm(n, rep(0, 5), diag(0.7, 5) + 0.3)
+X3 <- MASS::mvrnorm(n, rep(0, 5), diag(0.7, 5) + 0.3)
+
+data_test <- data.frame(X1, X2, X3)
+colnames(data_test) <- paste0("Var", 1:15)
+
+# Fit K-means with 3 clusters
+km <- KMeansVariablesQuant$new(k = 3, seed = 42)
+km$fit(data_test)
+
+# Display results
+km$print()
+km$summary()
+
+# Access cluster assignments
+clusters_df <- km$get_clusters_table()
+
+# Visualizations
+km$plot_correlation_circle()
+km$plot_biplot()
+km$plot_elbow(k_range = 2:8)
+
+# Predict new variables
+new_vars <- data.frame(
+  NewVar1 = rnorm(n),
+  NewVar2 = rnorm(n)
+)
+predictions <- km$predict(new_vars)
+
+# Illustrative variables (full analysis)
+illustrative_vars <- data.frame(
+  IllustVar1 = rnorm(n),
+  IllustVar2 = rnorm(n)
+)
+illust_results <- km$illustrative(illustrative_vars)
+}
+
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$fit`
+## ------------------------------------------------
+
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$predict`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+new_data <- data.frame(NewVar = rnorm(nrow(iris)))
+predictions <- km$predict(new_data)
+}
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$illustrative`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+illustrative_vars <- data.frame(NewVar = rnorm(nrow(iris)))
+illust_results <- km$illustrative(illustrative_vars, plot = TRUE)
+}
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$summary`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+summary_data <- km$summary(print_output = FALSE)
+}
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$plot_elbow`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+elbow_results <- km$plot_elbow(k_range = 2:8)
+}
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$plot_biplot`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+km$plot_biplot(dims = c(1, 2))
+}
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$plot_correlation_circle`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+km$plot_correlation_circle(dims = c(1, 2))
+}
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$print`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+km$print()
+}
+
+## ------------------------------------------------
+## Method `KMeansVariablesQuant$get_clusters_table`
+## ------------------------------------------------
+
+\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+clusters_df <- km$get_clusters_table()
+}
+}
+\references{
+\itemize{
+\item Vigneau, E., & Qannari, E. M. (2003). Clustering of variables around
+latent components. Communications in Statistics-Simulation and Computation,
+32(4), 1131-1150.
+\item Rakotomalala, R. (2020). Analyse de donnees avec R - Clustering de variables.
+}
+}
+\section{Public fields}{
+\if{html}{\out{<div class="r6-fields">}}
+\describe{
+\item{\code{data}}{Original data.frame provided to fit()}
+
+\item{\code{X_scaled}}{Standardized data matrix (n x p)}
+
+\item{\code{k}}{Number of clusters}
+
+\item{\code{max_iter}}{Maximum number of iterations per run}
+
+\item{\code{n_init}}{Number of random initializations}
+
+\item{\code{tol}}{Convergence tolerance}
+
+\item{\code{seed}}{Random seed for reproducibility}
+
+\item{\code{clusters}}{Integer vector of cluster assignments (length p)}
+
+\item{\code{centers}}{Matrix (n x k) of cluster centroids (PC1 for each cluster)}
+
+\item{\code{r2_matrix}}{Matrix (p x k) of R? between variables and centroids}
+
+\item{\code{inertia_total}}{Total inertia (sum of all cluster inertias)}
+
+\item{\code{inertia_by_cluster}}{Vector of inertia per cluster}
+
+\item{\code{n_iter}}{Number of iterations performed in best run}
+
+\item{\code{scale_center}}{Centering parameters (for predict)}
+
+\item{\code{scale_scale}}{Scaling parameters (for predict)}
+}
+\if{html}{\out{</div>}}
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -15,14 +234,13 @@ Elbow method to determine optimal number of clusters
 \item \href{#method-KMeansVariablesQuant-check_data}{\code{KMeansVariablesQuant$check_data()}}
 \item \href{#method-KMeansVariablesQuant-fit}{\code{KMeansVariablesQuant$fit()}}
 \item \href{#method-KMeansVariablesQuant-predict}{\code{KMeansVariablesQuant$predict()}}
+\item \href{#method-KMeansVariablesQuant-illustrative}{\code{KMeansVariablesQuant$illustrative()}}
 \item \href{#method-KMeansVariablesQuant-summary}{\code{KMeansVariablesQuant$summary()}}
-\item \href{#method-KMeansVariablesQuant-compute_elbow}{\code{KMeansVariablesQuant$compute_elbow()}}
 \item \href{#method-KMeansVariablesQuant-plot_elbow}{\code{KMeansVariablesQuant$plot_elbow()}}
+\item \href{#method-KMeansVariablesQuant-plot_biplot}{\code{KMeansVariablesQuant$plot_biplot()}}
 \item \href{#method-KMeansVariablesQuant-plot_correlation_circle}{\code{KMeansVariablesQuant$plot_correlation_circle()}}
-\item \href{#method-KMeansVariablesQuant-plot_variable_map}{\code{KMeansVariablesQuant$plot_variable_map()}}
-\item \href{#method-KMeansVariablesQuant-plot_center_map}{\code{KMeansVariablesQuant$plot_center_map()}}
-\item \href{#method-KMeansVariablesQuant-elbow}{\code{KMeansVariablesQuant$elbow()}}
 \item \href{#method-KMeansVariablesQuant-print}{\code{KMeansVariablesQuant$print()}}
+\item \href{#method-KMeansVariablesQuant-get_clusters_table}{\code{KMeansVariablesQuant$get_clusters_table()}}
 \item \href{#method-KMeansVariablesQuant-clone}{\code{KMeansVariablesQuant$clone()}}
 }
 }
@@ -30,6 +248,7 @@ Elbow method to determine optimal number of clusters
 \if{html}{\out{<a id="method-KMeansVariablesQuant-new"></a>}}
 \if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-new}{}}}
 \subsection{Method \code{new()}}{
+Create a new KMeansVariablesQuant object
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$new(
   k = 3,
@@ -40,22 +259,75 @@ Elbow method to determine optimal number of clusters
 )}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{k}}{Number of clusters (must be >= 2)}
+
+\item{\code{max_iter}}{Maximum iterations per run (default: 100)}
+
+\item{\code{n_init}}{Number of random initializations (default: 10)}
+
+\item{\code{tol}}{Convergence tolerance (default: 1e-4)}
+
+\item{\code{seed}}{Random seed for reproducibility (default: NULL)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+A new \code{KMeansVariablesQuant} object
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-KMeansVariablesQuant-check_data"></a>}}
 \if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-check_data}{}}}
 \subsection{Method \code{check_data()}}{
+Validate input data
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$check_data(X, min_vars = 2)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X}}{Data frame or matrix with numeric variables}
+
+\item{\code{min_vars}}{Minimum number of variables required (default: 2)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Validated data.frame
+}
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-KMeansVariablesQuant-fit"></a>}}
 \if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-fit}{}}}
 \subsection{Method \code{fit()}}{
+Fit the K-means clustering model on variables
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$fit(X, k = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X}}{Data frame or matrix with numeric variables (rows = observations, columns = variables)}
+
+\item{\code{k}}{Number of clusters (optional, overrides constructor value)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Self (invisibly) for method chaining
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -63,8 +335,72 @@ Elbow method to determine optimal number of clusters
 \if{html}{\out{<a id="method-KMeansVariablesQuant-predict"></a>}}
 \if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-predict}{}}}
 \subsection{Method \code{predict()}}{
+Assign new variables to existing clusters
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$predict(X_new)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X_new}}{Data frame with new variables (must have same number of observations as training data)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Data frame with cluster assignments and R? values
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+new_data <- data.frame(NewVar = rnorm(nrow(iris)))
+predictions <- km$predict(new_data)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-KMeansVariablesQuant-illustrative"></a>}}
+\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-illustrative}{}}}
+\subsection{Method \code{illustrative()}}{
+Project illustrative variables onto existing clusters
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$illustrative(X_illust, plot = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{X_illust}}{Data frame with illustrative variables}
+
+\item{\code{plot}}{Logical, whether to display the barplot (default: TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List containing:
+\itemize{
+\item \code{table} - Data frame with cluster assignments and R? values
+\item \code{r2_all_clusters} - Matrix of R? with all clusters (in \%)
+\item \code{plot} - Function to generate the barplot
+}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+illustrative_vars <- data.frame(NewVar = rnorm(nrow(iris)))
+illust_results <- km$illustrative(illustrative_vars, plot = TRUE)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -72,17 +408,37 @@ Elbow method to determine optimal number of clusters
 \if{html}{\out{<a id="method-KMeansVariablesQuant-summary"></a>}}
 \if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-summary}{}}}
 \subsection{Method \code{summary()}}{
+Generate detailed clustering statistics
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$summary(print_summary = FALSE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$summary(print_output = TRUE)}\if{html}{\out{</div>}}
 }
 
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{print_output}}{Logical, whether to print to console (default: TRUE)}
 }
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-KMeansVariablesQuant-compute_elbow"></a>}}
-\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-compute_elbow}{}}}
-\subsection{Method \code{compute_elbow()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$compute_elbow(k_range = 2:10)}\if{html}{\out{</div>}}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List containing:
+\itemize{
+\item \code{global_quality} - Data frame with global quality metrics
+\item \code{cluster_summary} - Data frame with per-cluster statistics
+\item \code{cor_latent} - Correlation matrix between latent components
+\item \code{r2_matrix} - R? matrix (variables x clusters)
+}
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+summary_data <- km$summary(print_output = FALSE)
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }
@@ -90,44 +446,9 @@ Elbow method to determine optimal number of clusters
 \if{html}{\out{<a id="method-KMeansVariablesQuant-plot_elbow"></a>}}
 \if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-plot_elbow}{}}}
 \subsection{Method \code{plot_elbow()}}{
+Determine optimal number of clusters using elbow method
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$plot_elbow(k_range = 2:10)}\if{html}{\out{</div>}}
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-KMeansVariablesQuant-plot_correlation_circle"></a>}}
-\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-plot_correlation_circle}{}}}
-\subsection{Method \code{plot_correlation_circle()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$plot_correlation_circle()}\if{html}{\out{</div>}}
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-KMeansVariablesQuant-plot_variable_map"></a>}}
-\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-plot_variable_map}{}}}
-\subsection{Method \code{plot_variable_map()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$plot_variable_map()}\if{html}{\out{</div>}}
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-KMeansVariablesQuant-plot_center_map"></a>}}
-\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-plot_center_map}{}}}
-\subsection{Method \code{plot_center_map()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$plot_center_map()}\if{html}{\out{</div>}}
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-KMeansVariablesQuant-elbow"></a>}}
-\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-elbow}{}}}
-\subsection{Method \code{elbow()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$elbow(k_range = 2:10, n_init = 20, plot = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$plot_elbow(k_range = 2:10, plot = TRUE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -135,22 +456,149 @@ Elbow method to determine optimal number of clusters
 \describe{
 \item{\code{k_range}}{Range of k values to test (default: 2:10)}
 
-\item{\code{n_init}}{Number of initializations per k (default: 20)}
-
 \item{\code{plot}}{Logical, whether to display the plot (default: TRUE)}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Returns}{
-List with optimal_k, results data.frame, and plot function
+List containing:
+\itemize{
+\item \code{optimal_k} - Recommended number of clusters
+\item \code{results} - Data frame with inertia for each k
+\item \code{plot} - Function to generate the elbow plot
 }
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+elbow_results <- km$plot_elbow(k_range = 2:8)
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-KMeansVariablesQuant-plot_biplot"></a>}}
+\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-plot_biplot}{}}}
+\subsection{Method \code{plot_biplot()}}{
+Plot variables in factorial space (PCA biplot)
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$plot_biplot(dims = c(1, 2))}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{dims}}{Dimensions to plot (default: c(1, 2))}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Coordinates matrix (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+km$plot_biplot(dims = c(1, 2))
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-KMeansVariablesQuant-plot_correlation_circle"></a>}}
+\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-plot_correlation_circle}{}}}
+\subsection{Method \code{plot_correlation_circle()}}{
+Plot correlation circle of variables with latent components
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$plot_correlation_circle(dims = c(1, 2))}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{dims}}{Dimensions to plot (default: c(1, 2))}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Correlation matrix (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+km$plot_correlation_circle(dims = c(1, 2))
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-KMeansVariablesQuant-print"></a>}}
 \if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-print}{}}}
 \subsection{Method \code{print()}}{
+Print model summary
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$print(...)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{...}}{Additional arguments (ignored)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Self (invisibly)
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+km$print()
+}
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-KMeansVariablesQuant-get_clusters_table"></a>}}
+\if{latex}{\out{\hypertarget{method-KMeansVariablesQuant-get_clusters_table}{}}}
+\subsection{Method \code{get_clusters_table()}}{
+Get cluster assignments as a data frame
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{KMeansVariablesQuant$get_clusters_table()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Data frame with variables and their cluster assignments
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+km <- KMeansVariablesQuant$new(k = 3)
+km$fit(iris[, 1:4])
+clusters_df <- km$get_clusters_table()
+}
+}
+\if{html}{\out{</div>}}
+
 }
 
 }

@@ -2,22 +2,49 @@
 % Please edit documentation in R/n_clusters.R
 \name{kmeans_elbow}
 \alias{kmeans_elbow}
-\title{Determine optimal number of clusters K using elbow method (K-Means Variables)}
+\title{Determine Optimal Number of Clusters for K-Means Variables}
 \usage{
 kmeans_elbow(X_num, k_range = 2:10, n_init = 20, seed = NULL)
 }
 \arguments{
-\item{X_num}{Numeric data matrix or data.frame}
+\item{X_num}{Numeric data matrix or data.frame (observations x variables)}
 
 \item{k_range}{Range of k values to test (default: 2:10)}
 
 \item{n_init}{Number of random initializations per k (default: 20)}
 
-\item{seed}{Random seed for reproducibility}
+\item{seed}{Random seed for reproducibility (default: NULL)}
 }
 \value{
-List with optimal_k, plot function, results data.frame
+List containing:
+\item{optimal_k}{Recommended number of clusters}
+\item{results}{Data frame with k, inertia, and marginal gain}
+\item{plot}{Function to generate dual elbow plots (inertia + gain)}
 }
 \description{
-Determine optimal number of clusters K using elbow method (K-Means Variables)
+Automatically selects the optimal number of clusters for K-means variable
+clustering using the elbow method. Tests a range of k values and maximizes
+total inertia (sum of squared correlations with cluster centroids).
+}
+\details{
+For each k in k_range, the algorithm:
+\enumerate{
+\item Runs K-means variable clustering with n_init initializations
+\item Keeps the solution with maximum total inertia
+\item Calculates marginal gain: D inertia = inertia(k) - inertia(k-1)
+}
+
+The optimal k maximizes perpendicular distance in the inertia curve
+(excluding k=2 to avoid edge effects).
+}
+\examples{
+\dontrun{
+# Automatic k selection for K-means variables
+data <- data.frame(matrix(rnorm(100 * 10), ncol = 10))
+result <- kmeans_elbow(data, k_range = 2:8, seed = 123)
+print(result$optimal_k)
+result$plot()
+print(result$results)
+}
+
 }

@@ -33,6 +33,7 @@ It stores the input dataset, the chosen method, and the resulting fitted model.
 \item \href{#method-ClusterEngine-predict}{\code{ClusterEngine$predict()}}
 \item \href{#method-ClusterEngine-print}{\code{ClusterEngine$print()}}
 \item \href{#method-ClusterEngine-summary}{\code{ClusterEngine$summary()}}
+\item \href{#method-ClusterEngine-elbow}{\code{ClusterEngine$elbow()}}
 \item \href{#method-ClusterEngine-clone}{\code{ClusterEngine$clone()}}
 }
 }
@@ -114,6 +115,28 @@ Display details of the fitted clustering model results
 
 \subsection{Returns}{
 Output of the model's summary results
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-ClusterEngine-elbow"></a>}}
+\if{latex}{\out{\hypertarget{method-ClusterEngine-elbow}{}}}
+\subsection{Method \code{elbow()}}{
+Compute elbow plot for optimal k selection
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{ClusterEngine$elbow(k_range = 2:10, plot = TRUE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{k_range}}{Range of k values to test (default: 2:10)}
+
+\item{\code{plot}}{Logical, whether to display the plot (default: TRUE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+Elbow analysis results (invisibly)
 }
 }
 \if{html}{\out{<hr>}}
