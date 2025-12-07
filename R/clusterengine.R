@@ -63,7 +63,7 @@ ClusterEngine <- R6::R6Class(
       # FIX: Changed from acm_cah to ClustModalities
       else if (self$method == "acm_cah") {
         hc <- ClustModalities$new()
-        hc$fit(self$data)
+        hc$fit(self$data, k= self$n_clusters)
         self$model <- hc
       }
 
